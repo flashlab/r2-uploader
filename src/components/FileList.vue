@@ -216,7 +216,7 @@ watch(uploading, (newVal) => {
     endPoint = localStorage.getItem('endPoint')
     apiKey = localStorage.getItem('apiKey')
     customDomain = localStorage.getItem('customDomain')
-    loadData()
+    //loadData()
   }
 })
 
@@ -226,7 +226,7 @@ watch(endPointUpdated, (newVal) => {
   customDomain = localStorage.getItem('customDomain')
   fileList.value = []
   dirMap.value = {}
-  loadData()
+  //loadData()
 })
 
 let allFileSize = ref(0)
@@ -437,7 +437,7 @@ let loadData = async function () {
   }
 
   axios({
-    method: 'patch',
+    method: 'post',
     headers: {
       'x-api-key': apiKey
     },
@@ -468,5 +468,5 @@ let loadData = async function () {
     })
 }
 
-loadData()
+//loadData()
 </script>
