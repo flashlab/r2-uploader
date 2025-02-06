@@ -101,7 +101,7 @@
                   class="w-full overflow-hidden text-ellipsis whitespace-nowrap"
                 >
                   <a
-                    :href="(customDomain ? customDomain : endPoint) + item.key"
+                    :href="customDomain + item.key"
                     target="_blank"
                     v-show="!selectMode"
                   >{{ item.fileName }}</a
@@ -208,22 +208,21 @@ let {uploading, endPointUpdated} = storeToRefs(statusStore)
 let selectMode = ref(false)
 
 let endPoint = localStorage.getItem('endPoint')
+let customDomain = localStorage.getItem('customDomain') ?? endPoint
 let apiKey = localStorage.getItem('apiKey')
-let customDomain = localStorage.getItem('customDomain')
 
 watch(uploading, (newVal) => {
   if (!newVal) {
-    endPoint = localStorage.getItem('endPoint')
-    apiKey = localStorage.getItem('apiKey')
-    customDomain = localStorage.getItem('customDomain')
+    //endPoint = localStorage.getItem('endPoint')
+    //apiKey = localStorage.getItem('apiKey')
     //loadData()
   }
 })
 
 watch(endPointUpdated, (newVal) => {
   endPoint = localStorage.getItem('endPoint')
+  customDomain = localStorage.getItem('customDomain') ?? endPoint
   apiKey = localStorage.getItem('apiKey')
-  customDomain = localStorage.getItem('customDomain')
   fileList.value = []
   dirMap.value = {}
   //loadData()
@@ -437,7 +436,7 @@ let loadData = async function () {
   }
 
   axios({
-    method: 'post',
+    method: 'patch',
     headers: {
       'x-api-key': apiKey
     },

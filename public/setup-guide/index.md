@@ -1,4 +1,4 @@
-<span style="font-size: .8rem">Last updated: 2023-09-12</span>
+<span style="font-size: .8rem">Last updated: 2025-02-06</span>
 
 ### Why this tool? 🤔
 
@@ -97,7 +97,7 @@ A Worker is like the backend of a website, it allows the R2 Uploader to communic
                respStatus = 201
             }
             break
-            case 'POST':
+            case 'PATCH':
             headers.set('Content-Type', 'application/json')
             respBody = JSON.stringify(await env.R2_BUCKET.list())
             break

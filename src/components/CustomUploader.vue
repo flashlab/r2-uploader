@@ -54,12 +54,11 @@
               class="bg-gray-300 dark:bg-neutral-700 w-[.5rem] h-[.5rem] mb-1 mr-1 relative rounded-xl overflow-hidden">
               <div class="absolute w-full bottom-0 left-0" style="height: 0" :style="{
                   height: progressMap[item.key] + '%'
-                }" :class="{
-                  'bg-red-500': statusMap[item.key] === 'error',
-                  'bg-amber-500	': statusMap[item.key] === 'dup',
-                  'bg-green-400': statusMap[item.key] !== 'error',
-                  'dark:bg-green-600': statusMap[item.key] !== 'error'
-                }"></div>
+                }" :class="[
+              statusMap[item.key] === 'error' ? 'bg-red-500' :
+              statusMap[item.key] === 'dup' ? 'bg-amber-500' :
+              'bg-green-400 dark:bg-green-600'
+            ]"></div>
             </div>
           </div>
         </div>
@@ -154,12 +153,13 @@
           :key="item.key">
           <img class="max-h-14 mr-2" :src="item.url" @load="imgLoad(item.id_key, $event)" />
           <div class="w-full bg-neutral-50 text-xs rounded dark:bg-[#333] px-2 py-2 relative shadow">
-            <div class="progress absolute h-[.1rem] bottom-0 left-0 bg-green-500 transition-all" :style="{
+            <div class="progress absolute h-[.1rem] bottom-0 left-0 transition-all" :style="{
                 width: progressMap[item.key] + '%'
-              }" :class="{
-                'bg-red-500': statusMap[item.key] === 'error',
-                'bg-amber-500	': statusMap[item.key] === 'dup'
-              }"></div>
+              }" :class="[
+              statusMap[item.key] === 'error' ? 'bg-red-500' :
+              statusMap[item.key] === 'dup' ? 'bg-amber-500' :
+              'bg-green-400 dark:bg-green-600'
+              ]"></div>
             <div v-show="editKey === item.key" class="flex">
               <form action="javascript:" @submit="renameThisFile(item)" class="flex mb-0 w-full">
                 <input class="text-xs w-full" type="text" style="padding: 0.2rem 0.4rem; margin: 0; height: auto"
@@ -178,10 +178,11 @@
               : item.key }}</span><br /><span :style="{
                 marginTop: editKey === item.key ? '0' : '0.25rem',
                 top: editKey !== item.key ? 0 : '-.2rem'
-              }" class="opacity-80 text-green-500 mt-1 inline-block relative" :class="{
-                'text-red-500': statusMap[item.key] === 'error',
-                'text-amber-500	': statusMap[item.key] === 'dup',
-              }">{{ parseByteSize(item.size) }}
+              }" class="opacity-80 mt-1 inline-block relative" :class="[
+              statusMap[item.key] === 'error' ? 'text-red-500' :
+              statusMap[item.key] === 'dup' ? 'text-amber-500' :
+              'text-green-400 dark:text-green-600'
+              ]">{{ parseByteSize(item.size) }}
               <span v-show="uploading && !item.compressing"> / {{ progressMap[item.key] }}%</span><span
                 v-show="item.compressing">Compressing...</span></span>
           </div>
@@ -202,12 +203,13 @@
           :key="item.key">
           <img class="max-h-14 mr-2" :src="item.url" />
           <div class="w-full bg-neutral-50 text-xs rounded dark:bg-[#333] px-2 py-2 relative shadow">
-            <div class="progress absolute h-[.1rem] bottom-0 left-0 bg-green-500 transition-all" :style="{
+            <div class="progress absolute h-[.1rem] bottom-0 left-0 transition-all" :style="{
                 width: progressMap[item.key] + '%'
-              }" :class="{
-                'bg-red-500': statusMap[item.key] === 'error',
-                'bg-amber-500	': statusMap[item.key] === 'dup'
-              }"></div>
+              }" :class="[
+              statusMap[item.key] === 'error' ? 'bg-red-500' :
+              statusMap[item.key] === 'dup' ? 'bg-amber-500' :
+              'bg-green-400 dark:bg-green-600'
+              ]"></div>
             <div v-show="editKey === item.key" class="flex">
               <form action="javascript:" @submit="renameThisFile(item)" class="flex mb-0 w-full">
                 <input class="text-xs w-full" type="text" style="padding: 0.2rem 0.4rem; margin: 0; height: auto"
@@ -226,10 +228,11 @@
               : item.key }}</span><br /><span :style="{
                 marginTop: editKey === item.key ? '0' : '0.25rem',
                 top: editKey !== item.key ? 0 : '-.2rem'
-              }" class="opacity-80 text-green-500 mt-1 inline-block relative" :class="{
-                'text-red-500': statusMap[item.key] === 'error',
-                'text-amber-500	': statusMap[item.key] === 'dup'
-              }">{{ parseByteSize(item.size) }} <a
+              }" class="opacity-80 mt-1 inline-block relative" :class="[
+              statusMap[item.key] === 'error' ? 'text-red-500' :
+              statusMap[item.key] === 'dup' ? 'text-amber-500' :
+              'text-green-400 dark:text-green-600'
+              ]">{{ parseByteSize(item.size) }} <a
                 :href="customDomain + (renameFileWithRandomId ? item.id_key : item.key) + dimensionMap[item.url]">dimension
               </a>
               <a :href="endPoint + (renameFileWithRandomId ? item.id_key : item.key)" target="_blank">preview</a>
@@ -278,8 +281,8 @@ let editKey = ref('')
 let urlSuffix = ''
 let renameFileWithRandomId = ref(false)
 let compressImagesBeforeUploading = ref(false)
-let customDomain = localStorage.getItem('customDomain')
 let endPoint = localStorage.getItem('endPoint')
+let customDomain = localStorage.getItem('customDomain') ?? endPoint
 let {endPointUpdated} = storeToRefs(statusStore)
 
 let clearUploadedFiles = function () {
@@ -307,7 +310,7 @@ let updateConflictBehave = function (e) {
 
 watch(endPointUpdated, (newVal) => {
   endPoint = localStorage.getItem('endPoint')
-  customDomain = localStorage.getItem('customDomain')
+  customDomain = localStorage.getItem('customDomain') ?? endPoint
 })
 
 watch(defaultCompressOptions, function (val) {
@@ -470,7 +473,7 @@ let showRenameInput = function (key, status) {
 }
 
 let genImagePreview  = function (ext, file) {
-  file.url = ['jpg', 'jpeg', 'gif', 'png', 'webp', 'bmp'].includes(ext) ?
+  file.url = ['jpg', 'jpeg', 'gif', 'png', 'webp', 'bmp'].includes(ext.toLowerCase()) ?
   URL.createObjectURL(file) : 'https://weavatar.com/avatar/84f99bb682f6cc6d69915e5f1c16ae0c?d=letter&letter=' + ext
 }
 
@@ -521,6 +524,26 @@ let formatFileName = function (name) {
   return name.replace(/\s/g, '_')
 }
 
+let generateUri = function (file) {
+  let endPoint = localStorage.getItem('endPoint')
+  let apiKey = localStorage.getItem('apiKey')
+  let url = null
+  let err = false
+
+  if (!endPoint || !apiKey) {
+    err = true
+    alert('Please set an endpoint and api key first.')
+  } else {
+    let file_key = renameFileWithRandomId.value ? file.id_key : file.key
+    url = endPoint + formatFileName(file_key)
+  }
+  return {
+    url: url,
+    apiKey: apiKey,
+    err: err
+  }
+}
+
 let handleFilesChange = function (e) {
   uploadedList.value = []
   progressMap.value = {}
@@ -568,7 +591,7 @@ let doneUploadingCleanUp = function () {
 }
 
 let removeThisFile = function (index, name) {
-  if (uploading.value) {
+  if (statusMap.value[name] == 'uploading') {
     let c = confirm(`Uploading is in progress, are you sure to remove ${name}?`)
 
     if (!c) {
@@ -581,15 +604,34 @@ let removeThisFile = function (index, name) {
     doneUploadingCleanUp()
 
     return false
-  }
-
-  let c = confirm(`Are you sure to remove ${name}?`)
-
+  } else if (statusMap.value[name] == 'done') {
+    const {url, apiKey, err} = generateUri(uploadedList.value[index])
+    let c = confirm(`Are you sure to remove ${name} from remote?`)
+    if (!c || err) {
+      return false
+    }
+    statusMap.value[name] == 'deleting'
+    axios({
+      method: 'delete',
+      headers: {
+        'x-api-key': apiKey
+      },
+      url: url
+    })
+    .then(() => {
+      uploadedList.value.splice(index, 1)
+    })
+    .catch(() => {
+      statusMap.value[name] == 'done'
+      alert('Failed to delete file.')
+    })
+} else {
+  let c = confirm(`are you sure to remove ${name}?`)
   if (!c) {
     return false
   }
-
   fileList.value.splice(index, 1)
+}
 }
 
 const uploadedList = ref([])
@@ -640,14 +682,8 @@ function handlePaste() {
 }
 
 function uploadFile(file) {
-  let endPoint = localStorage.getItem('endPoint')
-  let apiKey = localStorage.getItem('apiKey')
-
-  if (!endPoint || !apiKey) {
-    alert('Please set an endpoint and api key first.')
-    return
-  }
-
+  const {url, apiKey, err} = generateUri(file)
+  if (err) return false
   if (file['compressing'] !== undefined) {
     file.compressing = false
   }
@@ -655,12 +691,6 @@ function uploadFile(file) {
   abortControllerMap.value[file.key] = new AbortController()
   statusMap.value[file.key] = 'uploading'
 
-  let file_key = renameFileWithRandomId.value ? file.id_key : file.key
-
-  let fileName = '/' + formatFileName(file_key)
-  if (endPoint[endPoint.length - 1] === '/') {
-    fileName = formatFileName(file_key)
-  }
   file.startUploadingTime = new Date().getTime()
 
   realTimeSpeedRecords.value[file.key] = [
@@ -672,7 +702,7 @@ function uploadFile(file) {
 
   axios({
     method: 'put',
-    url: endPoint + fileName + urlSuffix,
+    url: url + urlSuffix,
     headers: {
       'x-api-key': apiKey,
       'content-type': file.type

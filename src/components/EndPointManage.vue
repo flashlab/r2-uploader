@@ -48,7 +48,7 @@
           </div>
           <div>
             <label for="custom_domain" class="text-sm">Custom Domain (Optional)</label>
-            <input type="text" placeholder="no need for the https:// prefix" v-model="newCustomDomain"
+            <input type="text" placeholder="https://..." v-model="newCustomDomain"
                    id="custom_domain"
                    style="margin-bottom: .5rem" class="text-xs">
             <div class="opacity-70 text-xs leading-4 mb-8">
@@ -64,9 +64,9 @@
           </div>
         </form>
       </article>
-      <article>
+      <!-- <article>
         <sync-endpoints></sync-endpoints>
-      </article>
+      </article> -->
     </details>
 
   </div>
@@ -109,11 +109,6 @@ let editThisEndpoint = function (endpoint) {
   newEndpoint.value = endpoint
   newApiKey.value = endPointList.value.find(item => item.endPoint === endpoint).apiKey
   newCustomDomain.value = endPointList.value.find(item => item.endPoint === endpoint).customDomain || ''
-
-  if (newCustomDomain.value !== '') {
-    let customDomainUrl = new URL(newCustomDomain.value)
-    newCustomDomain.value = customDomainUrl.hostname
-  }
 
   editingEndpoint.value = endpoint
 
@@ -184,7 +179,6 @@ const saveApiInfo = function () {
   }
 
   if (newCustomDomain.value !== '') {
-    newCustomDomain.value = 'https://' + newCustomDomain.value
     let customDomainUrl
     try {
       customDomainUrl = new URL(newCustomDomain.value)
