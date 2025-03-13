@@ -1,7 +1,7 @@
 <template>
   <div>
     <form action="javascript:">
-      <div class="font-bold italic"> Upload Files</div>
+      <div class="font-bold italic">Upload Files</div>
       <div>
         <label for="fileInput"
           class="rounded bg-emerald-200 dark:bg-emerald-800 px-4 py-2 inline-block mt-4 mb-4 cursor-pointer text-sm shadow hover:shadow-xl"
@@ -25,23 +25,20 @@
         </button>
       </div>
       <div>
-        <div class="text-xs opacity-50 mb-2">{{ fileList.length }} File{{ fileList.length === 1 ? '' : 's' }},
-          {{ parseByteSize(allFileSize) }} total.
+        <div class="text-xs opacity-50 mb-2">
+          {{ fileList.length }} File{{ fileList.length === 1 ? '' : 's' }}, {{ parseByteSize(allFileSize) }} total.
           <span v-show="skipFilesWithTheSameName && !uploading">
             Will skip
-            <span v-show="calcSkipFiles() === fileList.length && !uploading">all.
-            </span>
-            <span v-show="calcSkipFiles() !== fileList.length">{{ calcSkipFiles() }} file{{ calcSkipFiles() === 1 ? '' :
-              's' }}.
+            <span v-show="calcSkipFiles() === fileList.length && !uploading">all. </span>
+            <span v-show="calcSkipFiles() !== fileList.length">{{ calcSkipFiles() }} file{{ calcSkipFiles() === 1 ? '' : 's' }}.
             </span>
           </span>
         </div>
         <div v-show="fileList.length + uploadedList.length > 0">
           <div class="text-center text-xs py-4" v-show="uploading || uploadedList.length > 0">
             {{ uploadIsDone ? 'Uploaded' : 'Uploading' }} at
-            <span class="dark:text-green-200 text-green-800 italic font-bold">{{
-              globalSpeed
-              }}</span><span v-show="uploadIsDone">, All done.</span>
+            <span class="dark:text-green-200 text-green-800 italic font-bold">{{ globalSpeed }}</span>
+            <span v-show="uploadIsDone">, All done.</span>
           </div>
         </div>
 
@@ -101,7 +98,7 @@
               Compress images before uploading
             </label>
           </div>
-          <div v-show="compressImagesBeforeUploading" class="text-xs pt-4 pl-2">
+          <div v-if="compressImagesBeforeUploading" class="text-xs pt-4 pl-2">
             <div>
               <label for="removeEXIF" class="flex items-center"><input id="removeEXIF" type="checkbox"
                   v-model="defaultCompressOptions.removeEXIF"> Remove EXIF</label>
@@ -178,13 +175,13 @@
               : item.key }}</span><br /><span :style="{
                 marginTop: editKey === item.key ? '0' : '0.25rem',
                 top: editKey !== item.key ? 0 : '-.2rem'
-              }" class="opacity-80 mt-1 inline-block relative" :class="[
+              }" class="opacity-80 mt-1 inline-block relative font-mono" :class="[
               statusMap[item.key] === 'error' ? 'text-red-500' :
               statusMap[item.key] === 'dup' ? 'text-amber-500' :
               'text-green-400 dark:text-green-600'
               ]">{{ parseByteSize(item.size) }}
-              <span v-show="uploading && !item.compressing"> / {{ progressMap[item.key] }}%</span><span
-                v-show="item.compressing">Compressing...</span></span>
+              <span v-show="uploading && !item.compressing"> / {{ progressMap[item.key] }}%</span>
+              <span v-show="item.compressing">Compressing...</span></span>
           </div>
           <div v-show="editKey !== item.key" class="rounded text0-xs px-2 cursor-pointer hover:text-red-500"
             @click="removeThisFile(index, item.key)">
@@ -228,7 +225,7 @@
               : item.key }}</span><br /><span :style="{
                 marginTop: editKey === item.key ? '0' : '0.25rem',
                 top: editKey !== item.key ? 0 : '-.2rem'
-              }" class="opacity-80 mt-1 inline-block relative" :class="[
+              }" class="opacity-80 mt-1 inline-block relative font-mono" :class="[
               statusMap[item.key] === 'error' ? 'text-red-500' :
               statusMap[item.key] === 'dup' ? 'text-amber-500' :
               'text-green-400 dark:text-green-600'
@@ -236,8 +233,8 @@
                 :href="customDomain + (renameFileWithRandomId ? item.id_key : item.key) + dimensionMap[item.url]">dimension
               </a>
               <a :href="endPoint + (renameFileWithRandomId ? item.id_key : item.key)" target="_blank">preview</a>
-              <span v-show="uploading && !item.compressing"> / {{ progressMap[item.key] }}%</span><span
-                v-show="item.compressing">Compressing...</span></span>
+              <span v-show="uploading && !item.compressing"> / {{ progressMap[item.key] }}%</span>
+              <span v-show="item.compressing">Compressing...</span></span>
           </div>
           <div v-show="editKey !== item.key" class="rounded text0-xs px-2 cursor-pointer hover:text-red-500"
             @click="removeThisFile(index, item.key)">
@@ -348,7 +345,7 @@ let compressImage = async function (file) {
       quality: 0.8,
       convertSize: Infinity,
       retainExif: !defaultCompressOptions.removeEXIF,
-      mimeType: defaultCompressOptions.convertImageType ? ('image/' + defaultCompressOptions.imageType) : 'auto',
+      mimeType: defaultCompressOptions.convertImageType ? 'image/' + defaultCompressOptions.imageType : 'auto',
       maxWidth: defaultCompressOptions.maxWidth ? defaultCompressOptions.maxWidth : undefined,
       maxHeight: defaultCompressOptions.maxHeight ? defaultCompressOptions.maxHeight : undefined,
       success(result) {
@@ -362,7 +359,6 @@ let compressImage = async function (file) {
         newFile.key = file.key.split('.').shift() + '.' + extension
         newFile.url = file.url
 
-        console.log(newFile)
         console.log(`compressed ${file.name} from ${parseByteSize(file.size)} to ${parseByteSize(newFile.size)}`)
         resolve(newFile)
       },
@@ -417,9 +413,7 @@ let updateFileSkipProperty = function () {
 
   fileList.value.forEach((file) => {
     let diff_key = renameFileWithRandomId.value ? 'id_key' : 'key'
-    let match = uploadedFiles.findIndex(
-      (el) => el[diff_key] === formatFileName(file[diff_key])
-    )
+    let match = uploadedFiles.findIndex((el) => el[diff_key] === formatFileName(file[diff_key]))
     file.shouldBeSkipped = match !== -1
   })
 }
@@ -525,8 +519,8 @@ let formatFileName = function (name) {
 }
 
 let generateUri = function (file) {
-  let endPoint = localStorage.getItem('endPoint')
-  let apiKey = localStorage.getItem('apiKey')
+  const endPoint = localStorage.getItem('endPoint')
+  const apiKey = localStorage.getItem('apiKey')
   let url = null
   let err = false
 
@@ -666,7 +660,16 @@ const upload = function () {
 
 function handlePaste() {
   window.addEventListener('paste', (e) => {
+    // Check if any input or textarea is focused
+    const activeElement = document.activeElement;
+    const isInputFocused = activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA';
+    
+    if (isInputFocused) {
+      return; // Do nothing if an input/textarea is focused
+    }
     let files = e.clipboardData.files
+    if (files.length === 0) return; // Do nothing if no files were pasted
+
     renameFileWithRandomId.value = true
     compressImagesBeforeUploading.value = true
     Array.from(files).forEach((file) => {
@@ -710,8 +713,7 @@ function uploadFile(file) {
     signal: abortControllerMap.value[file.key].signal,
     data: file,
     onUploadProgress(event) {
-      const percentage = Math.round((100 * event.loaded) / event.total)
-      progressMap.value[file.key] = percentage
+      progressMap.value[file.key] = ((100 * event.loaded) / event.total).toFixed(1)
 
       realTimeSpeedRecords.value[file.key].push({
         time: new Date().getTime(),
