@@ -75,7 +75,7 @@ If you want to make your bucket private, you can do so by adding a new variable 
 1. Go to the worker page, go to the "Settings" and then click the "Variable" on the left side.
 2. Click on the "Edit variable" and "Add variable" button, then enter the variable name as "PRIVATE_BUCKET" and the value is "true", click "Save and deploy".
    
-This will make the Worker to check the `x-api-key` header for every request, and only allow the request with the correct API key to go through.
+This will make the Worker to check the `Authorization` header for every request, and only allow the request with the correct API key to go through.
 
 If you want the bucket to be public again, just delete the variable.
 

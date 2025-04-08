@@ -19,7 +19,6 @@
     "compressorjs": "^1.2.1",
     "crypto-js": "^4.2.0",
     "marked": "^9.1.6",
-    "mongodb": "^6.9.0",
     "nanoid": "^4.0.2",
     "pinia": "^2.2.2",
     "postcss": "^8.4.47",

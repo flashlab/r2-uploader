@@ -608,7 +608,7 @@ let removeThisFile = function (index, name) {
     axios({
       method: 'delete',
       headers: {
-        'x-api-key': apiKey
+        'Authorization': apiKey
       },
       url: url
     })
@@ -707,8 +707,8 @@ function uploadFile(file) {
     method: 'put',
     url: url + urlSuffix,
     headers: {
-      'x-api-key': apiKey,
-      'content-type': file.type
+      'Authorization': apiKey,
+      'Content-Type': file.type
     },
     signal: abortControllerMap.value[file.key].signal,
     data: file,

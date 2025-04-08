@@ -510,7 +510,7 @@ let deleteThisFile = function (key, isBatchDelete = false, options = {}) {
   axios({
     method: 'delete',
     headers: {
-      'x-api-key': localStorage.getItem('apiKey')
+      'Authorization': localStorage.getItem('apiKey')
     },
     url: endPoint + fileName
   })
@@ -557,7 +557,7 @@ async function loadData(action) {
     const res = await axios({
       method: 'patch',
       headers: {
-        'x-api-key': apiKey
+        'Authorization': apiKey
       },
       url: endPoint + (action === 'more' && globalCursor.value ? '?cursor=' + globalCursor.value : '')
     })
