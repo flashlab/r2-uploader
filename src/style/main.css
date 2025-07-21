@@ -140,3 +140,11 @@ table tbody:before {
 table tbody td {
   @apply px-4 py-2
 }
+
+.drop-zone {
+  border: 2px dashed #ccc;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
