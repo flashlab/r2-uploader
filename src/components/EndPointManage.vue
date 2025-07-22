@@ -1,6 +1,6 @@
 <template>
   <div>
-    <details :open="panelOpen === '1'" id="panel">
+    <details id="panel" :open="panelOpen === '1'">
       <summary class='font-bold italic'>
         Endpoints
       </summary>
@@ -16,18 +16,21 @@
             You need Cloudflare Workers to upload files to Cloudflare R2. Have a look at the
             <a href="/setup-guide/" class="underline">setup guide</a>.
           </div>
-          <div v-for="item in endPointList" class="flex mt-2">
-            <input type="radio" name="current_endpoint" :id="item.endPoint" :data-id="item.endPoint" :checked="item.endPoint === endPoint"
-                   @change="updateCurrentEndPoint(item.endPoint)" class="w-[2rem] shrink-0"><label
+          <div v-for="item in endPointList" :key="item.endPoint" class="flex mt-2">
+            <input
+:id="item.endPoint" type="radio" name="current_endpoint" :data-id="item.endPoint" :checked="item.endPoint === endPoint"
+                   class="w-[2rem] shrink-0" @change="updateCurrentEndPoint(item.endPoint)"><label
             :for="item.endPoint" class="text-xs w-full">{{ item.endPoint }}</label>
 
-            <button class="shrink-0 bg-transparent w-auto outline inline-block text-xs text-emerald-500 mb-0 mr-2"
-                    style="padding: 0; border: 0" @click="editThisEndpoint(item.endPoint)"
-                    :disabled="editingEndpoint !== item.endPoint && editingEndpoint !== ''">
+            <button
+class="shrink-0 bg-transparent w-auto outline inline-block text-xs text-emerald-500 mb-0 mr-2"
+                    style="padding: 0; border: 0" :disabled="editingEndpoint !== item.endPoint && editingEndpoint !== ''"
+                    @click="editThisEndpoint(item.endPoint)">
               {{ editingEndpoint === item.endPoint ? 'Cancel' : 'Edit' }}
             </button>
-            <button class="shrink-0 bg-transparent w-auto outline inline-block text-xs text-red-500 mb-0"
-                    style="padding: 0; border: 0" @click="deleteThisEndPoint(item.endPoint)" :disabled="editingEndpoint !== ''">Delete
+            <button
+class="shrink-0 bg-transparent w-auto outline inline-block text-xs text-red-500 mb-0"
+                    style="padding: 0; border: 0" :disabled="editingEndpoint !== ''" @click="deleteThisEndPoint(item.endPoint)">Delete
             </button>
           </div>
         </form>
@@ -39,17 +42,19 @@
           </div>
           <div>
             <label for="" class="text-sm">Workers Endpoint</label>
-            <input type="text" placeholder="https://..." v-model="newEndpoint" class="text-xs" required>
+            <input v-model="newEndpoint" type="text" placeholder="https://..." class="text-xs" required>
           </div>
           <div>
             <label for="api_key" class="text-sm">Workers Endpoint API Key</label>
-            <input type="password" placeholder="treat it like your browser history" v-model="newApiKey" required
-                   id="api_key" class="text-xs">
+            <input
+id="api_key" v-model="newApiKey" type="password" placeholder="treat it like your browser history"
+                   required class="text-xs">
           </div>
           <div>
             <label for="custom_domain" class="text-sm">Custom Domain (Optional)</label>
-            <input type="text" placeholder="https://..." v-model="newCustomDomain"
-                   id="custom_domain"
+            <input
+id="custom_domain" v-model="newCustomDomain" type="text"
+                   placeholder="https://..."
                    style="margin-bottom: .5rem" class="text-xs">
             <div class="opacity-70 text-xs leading-4 mb-8">
               Use your own domain name to access the files instead of <code
@@ -57,7 +62,8 @@
             </div>
           </div>
           <div class="text-center mt-4">
-            <button class="inline-block w-auto text-sm mb-0" :disabled="btnDisabled" type="submit"
+            <button
+class="inline-block w-auto text-sm mb-0" :disabled="btnDisabled" type="submit"
                     style="padding: .3rem 1rem">
               &nbsp;{{ btnText }}&nbsp;
             </button>

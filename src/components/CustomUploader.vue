@@ -3,26 +3,30 @@
   <div class="drop-zone" @dragover.prevent="handleDragOver" @drop="handleDrop" @paste="handlePaste">
     <span class="text-xs opacity-50">Drag and drop files here or paste files.</span>
     <div>
-      <label for="fileInput"
+      <label
+for="fileInput"
         class="rounded bg-emerald-200 dark:bg-emerald-800 px-4 py-2 inline-block mt-4 mb-4 cursor-pointer text-sm shadow hover:shadow-xl"
         :style="{
           opacity: uploading ? 0.5 : 1
         }">{{ chooseFileBtnText }}
       </label>
 
-      <label v-show="browserSupportsDirectoryUpload"
+      <label
+v-show="browserSupportsDirectoryUpload"
         class="ml-2 rounded bg-emerald-100 dark:bg-emerald-900 px-4 py-2 inline-block mt-4 mb-4 cursor-pointer text-sm shadow hover:shadow-xl"
         :style="{
           opacity: uploading ? 0.5 : 1
         }" @click="handleFolder">Choose Folder 📂</label>
 
-      <input id="fileInput" type="file" @change="handleFilesChange" multiple class="absolute left-[-9999rem]"
-        :disabled="uploading" />
+      <input
+id="fileInput" type="file" multiple class="absolute left-[-9999rem]" :disabled="uploading"
+        @change="handleFilesChange" />
     </div>
   </div>
-  <div class="mt-2" v-show="fileList.length">
-    <button class="inline-block w-auto shadow transition-all hover:shadow-xl hover:rounded-3xl" type="button"
-      @click="upload" :disabled="uploading">🔥 Upload
+  <div v-show="fileList.length" class="mt-2">
+    <button
+class="inline-block w-auto shadow transition-all hover:shadow-xl hover:rounded-3xl" type="button"
+      :disabled="uploading" @click="upload">🔥 Upload
     </button>
   </div>
   <div class="text-xs opacity-50 mb-2">
@@ -36,7 +40,7 @@
     </span>
   </div>
 
-  <div class="text-center text-xs py-4" v-show="uploading || uploadedList.length > 0">
+  <div v-show="uploading || uploadedList.length > 0" class="text-center text-xs py-4">
     {{ uploadIsDone ? 'Uploaded' : 'Uploading' }} at
     <span class="dark:text-green-200 text-green-800 italic font-bold">{{ globalSpeed }}</span>
     <span v-show="uploadIsDone">, All done.</span>
@@ -45,15 +49,18 @@
   <!-- Upload status panel begin -->
   <div v-show="fileList.length > 0 || uploadedList.length > 0" class="pb-4 pt-2">
     <div class="flex flex-wrap dark:bg-neutral-950 bg-neutral-50 pt-2 px-2 pb-1 rounded-xl shadow">
-      <div v-for="item in uploadedList" class="rounded-xl w-[.5rem] h-[.5rem] mb-1 mr-1" :class="[
+      <div
+v-for="item in uploadedList" :key="item.id_key" class="rounded-xl w-[.5rem] h-[.5rem] mb-1 mr-1" :class="[
         statusMap[item.id_key] === 'error' ? 'bg-red-500' :
           statusMap[item.id_key] === 'dup' ? 'bg-amber-500' :
             'bg-green-400 dark:bg-green-600'
       ]">
       </div>
-      <div v-for="item in fileList"
+      <div
+v-for="item in fileList" :key="item.id_key" 
         class="bg-gray-300 dark:bg-neutral-700 w-[.5rem] h-[.5rem] mb-1 mr-1 relative rounded-xl overflow-hidden">
-        <div class="absolute w-full bottom-0 left-0" style="height: 0" :style="{
+        <div
+class="absolute w-full bottom-0 left-0" style="height: 0" :style="{
           height: progressMap[item.id_key] + '%'
         }" :class="[
                 statusMap[item.id_key] === 'error' ? 'bg-red-500' :
@@ -69,40 +76,45 @@
       class="inline-block border-0 w-auto text-xs outline dark:bg-neutral-800 bg-neutral-100 hover:bg-neutral-300 hover:dark:bg-neutral-700 rounded-3xl"
       style="border: none;" @click="clearUploadedFiles">Dismiss</button>
   </div>
-  <div class="pb-4" v-show="fileList.length > 0 && !uploading">
+  <div v-show="fileList.length > 0 && !uploading" class="pb-4">
     <div class="mb-2 text-xs">If file with same name pre-exists on server, do</div>
     <div class="flex items-center mb-3 text-xs [&>label]:cursor-pointer [&>label]:!mr-4">
-      <input id="c-o-1" type="radio" value="" v-model="urlSuffix">
+      <input id="c-o-1" v-model="urlSuffix" type="radio" value="">
       <label for="c-o-1">Skip</label>
-      <input id="c-o-2" type="radio" value="rename" v-model="urlSuffix">
+      <input id="c-o-2" v-model="urlSuffix" type="radio" value="rename">
       <label for="c-o-2">Auto suffix with <code>_</code></label>
-      <input id="c-o-3" type="radio" value="force" v-model="urlSuffix">
+      <input id="c-o-3" v-model="urlSuffix" type="radio" value="force">
       <label for="c-o-3">Overwrite</label>
     </div>
     <div class="flex mb-2">
-      <input type="checkbox" class="text-xs shrink-0" :disabled="uploading" v-model="renameFileWithRandomId"
-        id="renameFileWithRandomId" />
+      <input
+id="renameFileWithRandomId" v-model="renameFileWithRandomId" type="checkbox" class="text-xs shrink-0"
+        :disabled="uploading" />
       <label class="text-xs" for="renameFileWithRandomId">Rename each file with a random ID</label>
     </div>
     <div class="flex">
-      <input type="checkbox" class="text-xs shrink-0" :disabled="uploading" v-model="compressImagesBeforeUploading"
-        id="compressImagesBeforeUploading" />
+      <input
+id="compressImagesBeforeUploading" v-model="compressImagesBeforeUploading" type="checkbox" class="text-xs shrink-0"
+        :disabled="uploading" />
       <label class="text-xs" for="compressImagesBeforeUploading">
         Compress images before uploading
       </label>
     </div>
     <div v-if="compressImagesBeforeUploading" class="text-xs pt-4 pl-2">
       <div>
-        <label for="removeEXIF" class="flex items-center"><input id="removeEXIF" type="checkbox"
-            v-model="defaultCompressOptions.removeEXIF"> Remove EXIF</label>
+        <label for="removeEXIF" class="flex items-center"><input
+id="removeEXIF" v-model="defaultCompressOptions.removeEXIF"
+            type="checkbox"> Remove EXIF</label>
       </div>
       <div class="flex">
         <label for="covertImageType" class="flex items-center">
-          <input id="covertImageType" type="checkbox" class="shrink-0"
-            v-model="defaultCompressOptions.convertImageType">
+          <input
+id="covertImageType" v-model="defaultCompressOptions.convertImageType" type="checkbox"
+            class="shrink-0">
           <span class="shrink-0">Covert to</span>
-          <select :disabled="!defaultCompressOptions.convertImageType" class="shrink-0 mb-0 ml-2 text-sm py-1 px-2"
-            v-model="defaultCompressOptions.imageType">
+          <select
+v-model="defaultCompressOptions.imageType" :disabled="!defaultCompressOptions.convertImageType"
+            class="shrink-0 mb-0 ml-2 text-sm py-1 px-2">
             <option value="jpeg">jpg</option>
             <option value="png">png</option>
             <option value="webp">webp</option>
@@ -112,37 +124,50 @@
       <div class="flex">
         <label for="maxWidth" class="flex items-center">
           <span class="shrink-0">Max Width:</span>
-          <input type="number" class="text-xs py-1 px-2 ml-1 mb-0"
-            style="margin-bottom: 0; padding: .25rem .25rem; height: auto" v-model="defaultCompressOptions.maxWidth"
-            id="maxWidth" placeholder="Infinity">
+          <input
+id="maxWidth" v-model="defaultCompressOptions.maxWidth"
+            type="number" class="text-xs py-1 px-2 ml-1 mb-0"
+            style="margin-bottom: 0; padding: .25rem .25rem; height: auto" placeholder="Infinity">
         </label>
       </div>
       <div class="flex">
         <label for="maxHeight" class="flex items-center">
           <span class="shrink-0">Max Height:</span>
-          <input type="number" class="text-xs py-1 px-2 ml-1 mb-0"
-            style="margin-bottom: 0; padding: .25rem .25rem; height: auto" v-model="defaultCompressOptions.maxHeight"
-            id="maxHeight" placeholder="Infinity">
+          <input
+id="maxHeight" v-model="defaultCompressOptions.maxHeight"
+            type="number" class="text-xs py-1 px-2 ml-1 mb-0"
+            style="margin-bottom: 0; padding: .25rem .25rem; height: auto" placeholder="Infinity">
         </label>
       </div>
       <div class="flex">
         <label for="quality" class="flex items-center">
           <span class="shrink-0">Image Quality:</span>
-          <input type="number" class="text-xs py-1 px-2 ml-1 mb-0"
-            style="margin-bottom: 0; padding: .25rem .25rem; height: auto" v-model="defaultCompressOptions.quality"
-            id="quality">
+          <input
+id="quality" v-model="defaultCompressOptions.quality"
+            type="number" class="text-xs py-1 px-2 ml-1 mb-0"
+            style="margin-bottom: 0; padding: .25rem .25rem; height: auto">
         </label>
       </div>
     </div>
+    <div class="flex pt-1 items-center">
+      <input
+id="uploadToFolder" v-model="uploadToFolder" type="checkbox" class="text-xs shrink-0"
+        :disabled="uploading" />
+      <label class="text-xs whitespace-nowrap" for="uploadToFolder"> Upload to folder </label>
+      <input
+v-model="customFolderName" type="text" class="text-xs px-2 py-1"
+        style="padding: 0.2rem 0.4rem; margin: 0; height: auto" placeholder="/" @blur="handleFolderNameBlur" />
+    </div>
   </div>
   <!-- Files Queued begin -->
-  <div class="pt-4 pb-2 text-xs" v-show="fileList.length">
+  <div v-show="fileList.length" class="pt-4 pb-2 text-xs">
     Files Queued:
   </div>
-  <div class="item rounded text-sm flex w-full mb-2 relative items-center" v-for="item in fileList" :key="item.id_key">
+  <div v-for="item in fileList" :key="item.id_key" class="item rounded text-sm flex w-full mb-2 relative items-center">
     <img class="max-h-14 mr-2" :src="item.url" @load="imgLoad(item, $event)" />
     <div class="w-full bg-neutral-50 text-xs rounded dark:bg-[#333] px-2 py-2 relative shadow">
-      <div class="progress absolute h-[.1rem] bottom-0 left-0 transition-all" :style="{
+      <div
+class="progress absolute h-[.1rem] bottom-0 left-0 transition-all" :style="{
         width: progressMap[item.id_key] + '%'
       }" :class="[
               statusMap[item.id_key] === 'error' ? 'bg-red-500' :
@@ -151,24 +176,29 @@
             ]">
       </div>
       <div v-show="editKey === item.id_key" class="flex">
-        <form action="javascript:" @submit="renameThisFile(item)" class="flex mb-0 w-full">
-          <input class="text-xs w-full" type="text" style="padding: 0.2rem 0.4rem; margin: 0; height: auto"
-            :value="renameFileWithRandomId ? item.id_key : item.key" :id="'input_' + item.id_key" />
-          <button class="ml-2 inline-block w-auto shrink-0 outline text-xs text-emerald-500 mb-0"
+        <form action="javascript:" class="flex mb-0 w-full" @submit="renameThisFile(item)">
+          <input
+:id="'input_' + item.id_key" class="text-xs w-full" type="text"
+            style="padding: 0.2rem 0.4rem; margin: 0; height: auto" :value="renameFileWithRandomId ? item.id_key : item.key" />
+          <button
+class="ml-2 inline-block w-auto shrink-0 outline text-xs text-emerald-500 mb-0"
             style="padding: 0; border: none; background: transparent" type="submit">Rename
           </button>
-          <button type="button" @click="editKey = null"
-            class="inline-block mb-0 w-auto shrink-0 outline ml-2 dark:text-white text-black text-xs"
-            style="padding: 0; border: 0">Cancel
+          <button
+type="button" class="inline-block mb-0 w-auto shrink-0 outline ml-2 dark:text-white text-black text-xs"
+            style="padding: 0; border: 0"
+            @click="editKey = null">Cancel
           </button>
         </form>
       </div>
-      <span :data-tooltip="statusMap[item.id_key] === 'uploading' ? 'Can\'t rename now' : 'Click to rename'"
-        v-show="editKey !== item.id_key" class="inline-block break-all"
+      <span
+v-show="editKey !== item.id_key"
+        :data-tooltip="statusMap[item.id_key] === 'uploading' ? 'Can\'t rename now' : 'Click to rename'" class="inline-block break-all"
         @click="showRenameInput(item.id_key, statusMap[item.id_key])">{{ renameFileWithRandomId ? item.id_key
-          : item.key }}
+        : item.key }}
       </span><br />
-      <span :style="{
+      <span
+:style="{
         marginTop: editKey === item.id_key ? '0' : '0.25rem',
         top: editKey !== item.id_key ? 0 : '-.2rem'
       }" class="opacity-80 mt-1 inline-block relative font-mono" :class="[
@@ -178,27 +208,32 @@
               ]">{{ parseByteSize(item.size) }}
         <span v-show="uploading && statusMap[item.id_key] !== 'compressing'"> / {{ progressMap[item.id_key] }}%</span>
         <span v-show="statusMap[item.id_key] === 'compressing'">Compressing...</span>
+        <span v-show="statusMap[item.id_key] === 'splitting' && item.isMpu">Splitting Chunks...</span>
       </span>
     </div>
-    <div v-show="editKey !== item.id_key" class="rounded text0-xs px-2 cursor-pointer hover:text-red-500"
+    <div
+v-show="editKey !== item.id_key" class="rounded text0-xs px-2 cursor-pointer hover:text-red-500"
       @click="removeThisFile(item)">
       <i class="iconfont icon-error"></i>
     </div>
-    <div title="Re-Upload this file" v-show="statusMap[item.id_key] !== 'uploading'"
+    <div
+v-show="statusMap[item.id_key] !== 'uploading'" title="Re-Upload this file"
       class="rounded text0-xs px-2 cursor-pointer" @click="reUploadThisFile(item)">
       <i class="iconfont icon-reload"></i>
     </div>
   </div>
   <!-- Files Queued end -->
   <!-- Uploaded List begin -->
-  <div class="pt-4 pb-2 text-xs" v-show="uploadedList.length">
+  <div v-show="uploadedList.length" class="pt-4 pb-2 text-xs">
     Uploaded List:
   </div>
-  <div class="item rounded text-sm flex w-full mb-2 relative items-center" v-for="item in uploadedList"
-    :key="item.id_key">
+  <div
+v-for="item in uploadedList" :key="item.id_key"
+    class="item rounded text-sm flex w-full mb-2 relative items-center">
     <img class="max-h-14 mr-2" :src="item.url" />
     <div class="w-full bg-neutral-50 text-xs rounded dark:bg-[#333] px-2 py-2 relative shadow">
-      <div class="progress absolute h-[.1rem] bottom-0 left-0 transition-all" :style="{
+      <div
+class="progress absolute h-[.1rem] bottom-0 left-0 transition-all" :style="{
         width: progressMap[item.id_key] + '%'
       }" :class="[
               statusMap[item.id_key] === 'error' ? 'bg-red-500' :
@@ -206,22 +241,27 @@
                   'bg-green-400 dark:bg-green-600'
             ]"></div>
       <div v-show="editKey === item.id_key" class="flex">
-        <form action="javascript:" @submit="renameThisFile(item)" class="flex mb-0 w-full">
-          <input class="text-xs w-full" type="text" style="padding: 0.2rem 0.4rem; margin: 0; height: auto"
-            :value="renameFileWithRandomId ? item.id_key : item.key" :id="'input_' + item.id_key" />
-          <button class="ml-2 inline-block w-auto shrink-0 outline text-xs text-emerald-500 mb-0"
+        <form action="javascript:" class="flex mb-0 w-full" @submit="renameThisFile(item)">
+          <input
+:id="'input_' + item.id_key" class="text-xs w-full" type="text"
+            style="padding: 0.2rem 0.4rem; margin: 0; height: auto" :value="renameFileWithRandomId ? item.id_key : item.key" />
+          <button
+class="ml-2 inline-block w-auto shrink-0 outline text-xs text-emerald-500 mb-0"
             style="padding: 0; border: none; background: transparent" type="submit">Rename
           </button>
-          <button type="button" @click="editKey = null"
-            class="inline-block mb-0 w-auto shrink-0 outline ml-2 dark:text-white text-black text-xs"
-            style="padding: 0; border: 0">Cancel
+          <button
+type="button" class="inline-block mb-0 w-auto shrink-0 outline ml-2 dark:text-white text-black text-xs"
+            style="padding: 0; border: 0"
+            @click="editKey = null">Cancel
           </button>
         </form>
       </div>
-      <span :data-tooltip="uploading ? 'Can\'t rename now' : 'Click to rename'" v-show="editKey !== item.id_key"
+      <span
+v-show="editKey !== item.id_key" :data-tooltip="uploading ? 'Can\'t rename now' : 'Click to rename'"
         class="inline-block break-all" @click="showRenameInput(item.id_key, statusMap[item.id_key])">{{
-          renameFileWithRandomId ? item.id_key
-            : item.key }}</span><br /><span :style="{
+        renameFileWithRandomId ? item.id_key
+        : item.key }}</span><br /><span
+:style="{
           marginTop: editKey === item.id_key ? '0' : '0.25rem',
           top: editKey !== item.id_key ? 0 : '-.2rem'
         }" class="opacity-80 mt-1 inline-block relative font-mono" :class="[
@@ -234,11 +274,13 @@
         <span v-show="uploading && statusMap[item.id_key] !== 'compressing'"> / {{ progressMap[item.id_key] }}%</span>
         <span v-show="statusMap[item.id_key] === 'compressing'">Compressing...</span></span>
     </div>
-    <div v-show="editKey !== item.id_key" class="rounded text0-xs px-2 cursor-pointer hover:text-red-500"
+    <div
+v-show="editKey !== item.id_key" class="rounded text0-xs px-2 cursor-pointer hover:text-red-500"
       @click="removeThisFile(item)">
       <i class="iconfont icon-error"></i>
     </div>
-    <div title="Re-Upload this file" v-show="statusMap[item.id_key] !== 'uploading'"
+    <div
+v-show="statusMap[item.id_key] !== 'uploading'" title="Re-Upload this file"
       class="rounded text0-xs px-2 cursor-pointer" @click="reUploadThisFile(item)">
       <i class="iconfont icon-reload"></i>
     </div>
@@ -273,8 +315,10 @@ let editKey = ref('')
 let urlSuffix = ref('')
 let renameFileWithRandomId = ref(false)
 let compressImagesBeforeUploading = ref(false)
-let endPoint = localStorage.getItem('endPoint')
-let customDomain = localStorage.getItem('customDomain') ?? endPoint
+let uploadToFolder = ref(false)
+let customFolderName = ref('')
+let endPoint = ref(localStorage.getItem('endPoint'))
+let customDomain = ref(localStorage.getItem('customDomain') || endPoint)
 let { endPointUpdated } = storeToRefs(statusStore)
 
 let clearUploadedFiles = function () {
@@ -297,8 +341,8 @@ let defaultCompressOptions = reactive({
 })
 
 watch(endPointUpdated, () => {
-  endPoint = localStorage.getItem('endPoint')
-  customDomain = localStorage.getItem('customDomain') ?? endPoint
+  endPoint.value = localStorage.getItem('endPoint')
+  customDomain.value = localStorage.getItem('customDomain') || endPoint
 })
 
 watch(defaultCompressOptions, function (val) {
@@ -436,30 +480,31 @@ let reUploadThisFile = function (file) {
 
 let renameThisFile = function (file) {
   const isUploaded = uploadedList.value.some((el) => el.id_key === file.id_key)
-  let input = document.getElementById('input_' + file.id_key)
-
+  let newName = document.getElementById('input_' + file.id_key).value
+              .trim().replace(/[\\/:"*?<>|]/g, ''); // Remove illegal characters
+  if (!newName) return false;
   if (renameFileWithRandomId.value) {
-    if (input.value === file.id_key) {
+    if (newName === file.id_key) {
       editKey.value = ''
       return false
     }
 
-    let match = fileList.value.findIndex((el) => el.id_key === input.value)
-    if (match === -1) match = uploadedList.value.findIndex((el) => el.id_key === input.value)
+    let match = fileList.value.findIndex((el) => el.id_key === newName)
+    if (match === -1) match = uploadedList.value.findIndex((el) => el.id_key === newName)
 
     if (match !== -1) {
       alert('File with the same id already exists.')
       return false
     }
 
-    file.id_key = input.value
+    file.id_key = newName
     editKey.value = ''
   } else {
-    if (input.value === file.key) {
+    if (newName === file.key) {
       editKey.value = ''
       return false
     }
-    file.key = input.value
+    file.key = newName
     editKey.value = ''
   }
   if (isUploaded && confirm('Upload and force rename?')) {
@@ -523,22 +568,55 @@ async function handleDirectoryEntry_v2(dirHandle, basePath, files) {
 }
 
 let generateUri = function (file) {
-  const endPoint = localStorage.getItem('endPoint')
   const apiKey = localStorage.getItem('apiKey')
   let url = null
   let err = false
 
-  if (!endPoint || !apiKey) {
+  if (!endPoint.value || !apiKey) {
     err = true
     alert('Please set an endpoint and api key first.')
   } else {
     let file_key = renameFileWithRandomId.value ? file.id_key : file.key
-    url = endPoint + file_key
+    url = endPoint.value + file_key
   }
   return {
     url: url,
     apiKey: apiKey,
     err: err
+  }
+}
+
+let handleFolderNameBlur = function () {
+  if (!uploadToFolder.value || !customFolderName.value || fileList.value.length === 0) {
+    return
+  }
+
+  if (customFolderName.value === '/') {
+    customFolderName.value = ''
+    return
+  }
+
+  let folderPath = customFolderName.value.replace(/^\/+/, '')
+  
+  // Normalize folder path to ensure it ends with /
+  if (folderPath && !folderPath.endsWith('/')) {
+    folderPath = folderPath + '/'
+  }
+  customFolderName.value = folderPath
+
+  fileList.value = fileList.value.map(file => {
+    let fileName = file.key.split('/').pop()
+    let idFileName = file.id_key.split('/').pop()
+
+    file.key = folderPath + fileName
+    file.id_key = folderPath + idFileName
+
+    return file
+  })
+
+  // Update skip properties if needed
+  if (skipFilesWithTheSameName.value) {
+    updateFileSkipProperty()
   }
 }
 
@@ -570,10 +648,28 @@ let handleFiles = function (files) {
   // abortControllerMap.value = {}
 
   Array.from(files).forEach((file) => {
-    file.key = file.name
+    // If uploadToFolder, prepend it to the file path
+    if (uploadToFolder.value && customFolderName.value) {
+      let folderPath = customFolderName.value
+      if (!folderPath.endsWith('/')) {
+        folderPath = folderPath + '/'
+      }
+      file.key = folderPath + file.name
+    } else {
+      file.key = file.name
+    }
     // get extension
     let extension = file.name.split('.').pop()
-    file.id_key = nanoid(16) + '.' + extension
+    // If we have a folder path, include it in the id_key as well
+    if (uploadToFolder.value && customFolderName.value) {
+      let folderPath = customFolderName.value
+      if (!folderPath.endsWith('/')) {
+        folderPath = folderPath + '/'
+      }
+      file.id_key = folderPath + nanoid(16) + '.' + extension
+    } else {
+      file.id_key = nanoid(16) + '.' + extension
+    }
     statusMap[file.id_key] = 'readytouupload'
     genImagePreview(extension, file)
   })
@@ -609,9 +705,9 @@ const upload = function () {
     if (file.shouldBeSkipped) return false
 
     if (compressImagesBeforeUploading.value) {
-      statusMap[item.id_key] = 'compressing'
+      statusMap[file.id_key] = 'compressing'
       fileList.value[index] = await compressImage(file)
-      statusMap[item.id_key] = 'readytouupload'
+      statusMap[file.id_key] = 'readytouupload'
       uploadFile(fileList.value[index])
       return false
     }
@@ -637,6 +733,11 @@ function uploadFile(file) {
       loaded: 0
     }
   ]
+
+  if (file.size > 1024 * 1024 * 95) {
+    mpuUploadFile(file, apiKey)
+    return false
+  }
 
   axios({
     method: 'put',
@@ -678,6 +779,215 @@ function uploadFile(file) {
       progressMap.value[file.id_key] = 100
       doneUploadingCleanUp()
     })
+}
+
+async function remoteSupportMpu() {
+  try {
+    await axios.get(endPoint.value + 'support_mpu')
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+async function mpuUploadFile(file, apiKey) {
+  console.log(`file size is ${file.size}, switching to mpu`)
+
+  const fileName = renameFileWithRandomId.value ? file.id_key : file.key
+  file['isMpu'] = true
+
+  let remoteSupport = await remoteSupportMpu(endPoint.value)
+
+  if (!remoteSupport) {
+    alert(
+      `R2 workers has refactored its code to support big file uploading, please see the new setup guide at https://r2.jw1.dev/setup-guide`
+    )
+    return false
+  }
+
+  let {data} = await axios({
+    method: 'post',
+    url: endPoint.value + 'mpu/create/' + fileName,
+    headers: {
+      'x-api-key': apiKey
+    }
+  })
+  let uploadId = data.uploadId
+
+  const partSize = 1024 * 1024 * 10
+  const predictedParts = Math.ceil(file.size / partSize)
+  const parts = []
+  const maxThreads = 5
+  const completedParts = []
+  const activePartsSpeed = {}
+
+  let totalLoaded = 0
+  let activeThreadCount = 0
+
+  abortControllerMap.value[file.id_key] = []
+
+  let split_i = 0
+
+  async function _splitFileParts(_file, start, end) {
+    const part = _file.slice(start, end)
+    parts.push(part)
+  }
+
+  statusMap.value[file.id_key] = 'splitting'
+  while (parts.length < predictedParts) {
+    const start = split_i * partSize
+    const end = Math.min(file.size, (split_i + 1) * partSize)
+
+    await _splitFileParts(file, start, end)
+    split_i++
+  }
+  statusMap.value[file.id_key] = 'uploading'
+
+  let _s = setInterval(function () {
+    if (completedParts.length === parts.length || file.aborted) {
+      clearInterval(_s)
+      return false
+    }
+
+    realTimeSpeedRecords.value[file.id_key].push({
+      time: new Date().getTime(),
+      loaded: totalLoaded
+    })
+
+    file['mpuParts'] = parts.length
+    file['mpuDoneParts'] = completedParts.length
+
+    progressMap.value[file.id_key] = ((totalLoaded / file.size) * 100).toFixed(1)
+  }, 100)
+
+  for (let i = 0; i < parts.length; i++) {
+    let part = parts[i]
+    let partNumber = i + 1
+
+    if (file.aborted === true) {
+      setTimeout(async function () {
+        await axios({
+          method: 'delete',
+          url: endPoint.value + 'mpu/' + filename + '?' + `uploadId=${uploadId}`,
+          headers: {
+            'x-api-key': apiKey
+          }
+        })
+      }, 500)
+      break
+    }
+
+    // threads full, wait here
+    if (activeThreadCount >= maxThreads) {
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      i--
+      continue
+    }
+
+    // do not use await here
+    uploadParts({
+      part,
+      partNumber
+    })
+
+    activeThreadCount++
+  }
+
+  async function uploadParts(_p, retryLeft = 5) {
+    if (retryLeft === 0) {
+      statusMap.value[file.id_key] = 'error'
+
+      abortControllerMap.value[file.id_key].forEach((s) => {
+        try {
+          s.abort()
+        } catch (_) {}
+      })
+
+      file.uploading = false
+      file['mpuParts'] = 0
+      file['mpuDoneParts'] = 0
+
+      clearInterval(_s)
+      return false
+    }
+
+    let part = _p.part
+    let partNumber = _p.partNumber
+
+    if (!activePartsSpeed[partNumber]) {
+      activePartsSpeed[partNumber] = []
+    }
+
+    abortControllerMap.value[file.id_key][partNumber] = new AbortController()
+
+    let res
+
+    try {
+      res = await axios({
+        method: 'put',
+        url: endPoint.value + 'mpu/' + fileName + '?' + `uploadId=${uploadId}&partNumber=${partNumber}`,
+        headers: {
+          'x-api-key': apiKey,
+          'content-type': file.type
+        },
+        signal: abortControllerMap.value[file.id_key][partNumber].signal,
+        data: part,
+        onUploadProgress: function (event) {
+          totalLoaded += event.bytes
+        }
+      })
+    } catch (e) {
+      setTimeout(async function () {
+        await uploadParts(_p, retryLeft - 1)
+      }, 500)
+      return false
+    }
+
+    // release the thread
+    activeThreadCount--
+
+    completedParts.push({
+      partNumber,
+      etag: res.data.etag
+    })
+
+    // remove abort signal
+    abortControllerMap.value[file.id_key][partNumber] = null
+
+    if (completedParts.length === parts.length) {
+      axios({
+        method: 'post',
+        url: endPoint.value + 'mpu/complete/' + fileName + '?' + `uploadId=${uploadId}`,
+        headers: {
+          'x-api-key': apiKey
+        },
+        data: {
+          parts
+        }
+      }).then((res) => {
+        statusMap.value[file.id_key] = 'done'
+        const key = decodeURIComponent(res.headers['content-location'])
+        if (key && key != file.key) file.key = key
+        file.endUploadingTime = new Date().getTime()
+        file.uploadUsedTime = file.endUploadingTime - file.startUploadingTime
+        file.uploadSpeed = calcUploadSpeed(file.size, file.uploadUsedTime)
+      })
+      .catch((e) => {
+        if (e.response && e.response.status == 409) {
+          statusMap.value[file.id_key] = 'dup'
+          uploadedList.value.push(file)
+        } else statusMap.value[file.id_key] = 'error'
+      })
+      .finally(() => {
+        if (statusMap.value[file.id_key] !== 'error') {
+          if (uploadedList.value.findIndex((el) => el.id_key === file.id_key) === -1) uploadedList.value.push(file)
+          fileList.value = fileList.value.filter((item) => item.id_key !== file.id_key)
+        }
+        progressMap.value[file.id_key] = 100
+        doneUploadingCleanUp()
+      })
+    }
+  }
 }
 
 let globalSpeed = ref('0B /s')
@@ -731,5 +1041,47 @@ watch(
     deep: true
   }
 )
+
+// Add watch handler for uploadToFolder
+watch(uploadToFolder, (newVal) => {
+  if (!newVal) {
+    // When unchecked, remove folder path from all files
+    fileList.value = fileList.value.map(file => {
+      // Get just the filename without any path
+      let fileName = file.key.split('/').pop()
+      let idFileName = file.id_key.split('/').pop()
+
+      file.key = fileName
+      file.id_key = idFileName
+
+      return file
+    })
+  } else if (customFolderName.value && customFolderName.value !== '/') {
+    // When checked and there's a custom folder name, apply it
+    let folderPath = customFolderName.value
+    if (!folderPath.endsWith('/')) {
+      folderPath = folderPath + '/'
+    }
+    customFolderName.value = folderPath
+
+    fileList.value = fileList.value.map(file => {
+      // Get just the filename without any path
+      let fileName = file.key.split('/').pop()
+      let idFileName = file.id_key.split('/').pop()
+
+      // Update both key and id_key with new folder path
+      file.key = folderPath + fileName
+      file.id_key = folderPath + idFileName
+
+      return file
+    })
+  }
+
+  // Update skip properties if needed
+  if (skipFilesWithTheSameName.value) {
+    updateFileSkipProperty()
+  }
+})
+
 watch([urlSuffix, renameFileWithRandomId], updateFileSkipProperty);
 </script>

@@ -9,17 +9,17 @@
         v-show="!selectMode"
         class="text-xs inline-block w-auto outline mb-0"
         style="padding: 0.3rem 0.5rem"
-        @click="loadData"
         :aria-busy="loading"
         :disabled="loading || !endPoint"
+        @click="loadData"
       >
         Refresh
       </button>
       <button
         class="text-xs inline-block w-auto outline mb-0"
         style="padding: 0.3rem 0.5rem"
-        @click="toggleSelectMode"
         :disabled="fileList.length === 0 || loading"
+        @click="toggleSelectMode"
       >
         {{ selectMode && fileList.length ? 'Quit Selection Mode' : 'Selection Mode' }}
       </button>
@@ -45,34 +45,34 @@
     </div>
 
     <div>
-      <div class="text-xs" v-show="!loading && fileList.length === 0 && !loadDataErrorText">
+      <div v-show="!loading && fileList.length === 0 && !loadDataErrorText" class="text-xs">
         Seems like we got nothing here.
       </div>
-      <div class="text-red-500 text-xs" v-show="loadDataErrorText">
+      <div v-show="loadDataErrorText" class="text-red-500 text-xs">
         {{ loadDataErrorText }}
 
         <pre class="mt-2"><code class="text-xs">{{ loadDataErrorStack }}</code></pre>
       </div>
-      <div class="text-xs mb-4" v-show="fileList.length > 0">
+      <div v-show="fileList.length > 0" class="text-xs mb-4">
         <span class="font-bold">{{ globalCursor ? 'More than' : '' }}</span> {{ fileList.length }} file{{
           fileList.length === 1 ? '' : 's'
         }}, {{ parseByteSize(allFileSize) }} total.
         <div class="inline-flex space-x-2">
           <button
-            class="inline outline px-2 py-1 text-xs w-auto mb-0"
             v-show="globalCursor"
-            @click="loadData('more')"
+            class="inline outline px-2 py-1 text-xs w-auto mb-0"
             :aria-busy="loading"
             :disabled="loading"
+            @click="loadData('more')"
           >
             Load next page
           </button>
         </div>
       </div>
 
-      <div class="text-xs mb-2" v-show="fileList.length > 0">
+      <div v-show="fileList.length > 0" class="text-xs mb-2">
         Sort by
-        <select class="text-xs inline-block w-[10rem] mb-0" v-model="sort">
+        <select v-model="sort" class="text-xs inline-block w-[10rem] mb-0">
           <option value="0">Default</option>
           <option value="1">Date(newest first)</option>
           <option value="2">Date(oldest first)</option>
@@ -81,12 +81,12 @@
         </select>
       </div>
 
-      <div class="pb-4" v-show="fileList.length > 0">
+      <div v-show="fileList.length > 0" class="pb-4">
         <label for="seeFolderStructure" class="text-xs" :aria-busy="reconstructing">
           <input
-            type="checkbox"
             id="seeFolderStructure"
             v-model="seeFolderStructure"
+            type="checkbox"
             class="mr-2"
             :disabled="reconstructing"
           />
@@ -96,8 +96,6 @@
 
       <div>
         <div
-          class="rounded-lg mb-2"
-          :class="seeFolderStructure ? 'bg-neutral-50 dark:bg-[#333] p-2 shadow' : ''"
           v-for="folder in Object.keys(dirMap).map((el) => {
             return {
               name: el,
@@ -105,41 +103,43 @@
             }
           })"
           :key="folder.name + '_' + structureId"
+          class="rounded-lg mb-2"
+          :class="seeFolderStructure ? 'bg-neutral-50 dark:bg-[#333] p-2 shadow' : ''"
         >
           <details open class="mb-0 pb-1">
-            <summary class="text-xs" v-show="seeFolderStructure">
+            <summary v-show="seeFolderStructure" class="text-xs">
               {{ folder.name }}
             </summary>
 
             <div
-              class="mb-2 text-xs"
               v-show="selectMode"
+              class="mb-2 text-xs"
               @mouseenter="mouseOnSelectionCheckbox = true"
               @mouseleave="mouseOnSelectionCheckbox = false"
             >
               <label :for="folder.name"
                 ><input
+                  :id="folder.name"
                   name="select_all_for_folder"
                   class="mr-2"
                   type="checkbox"
-                  :id="folder.name"
                   @change="handleFolderSelect(folder.name)"
                 />
                 Select All</label
               >
             </div>
             <div
-              class="item mb-2 rounded text-sm py-1 flex items-center justify-between"
-              :class="seeFolderStructure ? 'pl-4' : ''"
               v-for="item in dirMap[folder.name]"
               :key="item.key"
+              class="item mb-2 rounded text-sm py-1 flex items-center justify-between"
+              :class="seeFolderStructure ? 'pl-4' : ''"
             >
-              <div class="w-[2rem]" v-show="selectMode">
+              <div v-show="selectMode" class="w-[2rem]">
                 <input
+                  :id="item.key"
+                  v-model="item.selected"
                   type="checkbox"
                   @change="updateSelectedFiles(item, folder.name)"
-                  v-model="item.selected"
-                  :id="item.key"
                 />
               </div>
               <div
@@ -150,19 +150,19 @@
                 }"
               >
                 <div class="w-full overflow-hidden text-ellipsis whitespace-nowrap">
-                  <a :href="(customDomain ? customDomain : endPoint) + item.key" target="_blank" v-show="!selectMode">{{
+                  <a v-show="!selectMode" :href="(customDomain ? customDomain : endPoint) + item.key" target="_blank">{{
                     item.fileName
                   }}</a>
                   <label v-show="selectMode" :for="item.key" class="mb-0">{{ item.fileName }}</label>
                 </div>
               </div>
-              <div class="actions w-[5rem] shrink-0 text-right" v-show="!selectMode">
+              <div v-show="!selectMode" class="actions w-[5rem] shrink-0 text-right">
                 <button
                   style="border: none; padding: 0.2rem 0.3rem"
                   class="w-auto inline-block outline text-xs text-red-500 mb-0"
-                  @click="deleteThisFile(item.key)"
                   :aria-busy="deletingKey === item.key"
                   :disabled="deletingKey === item.key"
+                  @click="deleteThisFile(item.key)"
                 >
                   Delete
                 </button>
@@ -173,11 +173,11 @@
         <div>
           <div class="inline-flex space-x-2">
             <button
-              class="inline outline px-2 py-1 text-xs w-auto mb-0"
               v-show="globalCursor"
-              @click="loadData('more')"
+              class="inline outline px-2 py-1 text-xs w-auto mb-0"
               :aria-busy="loading"
               :disabled="loading"
+              @click="loadData('more')"
             >
               Load next page
             </button>

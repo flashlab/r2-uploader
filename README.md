@@ -28,7 +28,114 @@ A Worker is like the backend of a website, it allows the R2 Uploader to communic
 2. On the left panel, there is a section called "Workers & Pages". Click on it.
 3. Click on the "Create Application" button and the click on the "Create Worker" button.
 4. So now Cloudflare will automatically generate a name for your Worker, you can either enter a name you like or leave it as it is. Ignore that code preview section, and now click the "Deploy" button.
-5. Click on the button "Edit code", now you will see a code editor, delete all the code in it and paste the code within **setup-guide**.
+5. Click on the button "Edit code", now you will see a code editor, delete all the code in it and paste the code  below:
+
+   <details><summary>Expand the code</summary>
+
+   ```js
+   var hasValidHeader = (request, env) => {
+      return request.headers.get('Authorization') === env.AUTH_KEY_SECRET
+   }
+   function authorizeRequest(request, env, key) {
+      switch (request.method) {
+      case 'PUT':
+         if (key.length < 1) return false
+         return hasValidHeader(request, env)
+      case 'DELETE':
+         if (key.length < 1) return false
+         return hasValidHeader(request, env)
+      case 'PATCH':
+         return hasValidHeader(request, env)
+      case 'GET':
+         if (key.length < 1) return false
+         return !env.PRIVATE_BUCKET || hasValidHeader(request, env)
+      case 'OPTIONS':
+         return true
+      default:
+         return false
+      }
+   }
+   var worker_default = {
+      async fetch(request, env) {
+      const url = new URL(request.url)
+      let key = decodeURIComponent(url.pathname.slice(5))
+      let respBody = null
+      let respStatus = 200
+      if (!authorizeRequest(request, env, key)) {
+         return new Response('Forbidden', { status: 403 })
+      }
+      const headers = new Headers()
+      // CORS setup
+      headers.set('Access-Control-Allow-Origin', '*')
+      headers.set('Access-Control-Allow-Methods', 'PUT, PATCH, GET, DELETE, OPTIONS')
+      headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+      headers.set('Access-Control-Expose-Headers', 'Content-Location')
+      try {
+         switch (request.method) {
+            case 'PUT':
+            let file = await env.R2_BUCKET.head(key);
+            if (file && url.searchParams.get('force') == null) {
+               if (url.searchParams.get('rename') != null) {
+                  const dot = key.lastIndexOf('.')
+                  if (dot == -1) key += '_'
+                  else key = key.substring(0, dot) + '_' + key.substring(dot)
+                  file = await env.R2_BUCKET.head(key)
+               }
+               if (file) {
+                  respBody = 'File already exists!'
+                  respStatus = 409
+                  break
+               }
+            }
+            const saved = await env.R2_BUCKET.put(key, request.body, {
+               httpMetadata: {
+                  contentType: request.headers.get('Content-Type') || '',
+                  cacheControl: 'public, max-age=604800'
+               }
+            })
+            if (saved) {
+               headers.set('Content-Location', encodeURIComponent(key))
+               respStatus = 201
+            }
+            break
+            case 'PATCH':
+            headers.set('Content-Type', 'application/json')
+            respBody = JSON.stringify(await env.R2_BUCKET.list())
+            break
+            case 'GET':
+            const object = await env.R2_BUCKET.get(key)
+            if (object === null) {
+               respBody = 'Object Not Found!'
+               respStatus = 404
+               break
+            }
+            object.writeHttpMetadata(headers)
+            headers.set('etag', object.httpEtag)
+            respBody = object.body
+            break
+            case 'DELETE':
+            await env.R2_BUCKET.delete(key)
+            respBody = 'Deleted!'
+            break
+            case 'OPTIONS':
+            break
+            default:
+            respBody = 'Method Not Allowed!'
+            respStatus = 405
+         }
+      } catch (error) {
+         return new Response("Internal Server Error", { status: 500 })
+      }
+      return new Response(respBody, {
+         headers: headers,
+         status: respStatus
+      })
+      }
+   }
+   export { worker_default as default }
+   ```
+
+   </details>
 6. Now click on the "Save and Deploy" button, you will see a URL on top of the page, copy it to somewhere like a notepad, **we will need it later**.
 7. Go to the worker page, go to the "Settings" and then click the "Variable" on the left side.
 

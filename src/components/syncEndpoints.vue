@@ -3,14 +3,14 @@
     <div class="pb-2 text-xs opacity-80">
       Sync Endpoints
     </div>
-    <div aria-busy="true" v-show="findingUser">
+    <div v-show="findingUser" aria-busy="true">
 
     </div>
-    <div class="text-sm" v-show="!isLogin && !findingUser">
+    <div v-show="!isLogin && !findingUser" class="text-sm">
       To sync your endpoints across devices, you can login with your GitHub account. All the information will be
       AES encrypted locally and then stored in our database.
     </div>
-    <div class="mt-6" v-show="!isLogin && !findingUser">
+    <div v-show="!isLogin && !findingUser" class="mt-6">
       <button class="text-sm inline-block w-auto mb-0" @click="goToLogin">Login With <img
         class="h-[1.3rem] relative top-[-.1rem]"
         :src="isDark ? 'https://r2-cf-api.jw1.dev/GitHub_Logo.png' : 'https://r2-cf-api.jw1.dev/GitHub_Logo_White.png'"
@@ -23,7 +23,7 @@
       </div>
       <div>
         <div>
-          <div class="text-xs mb-4" v-show="!hasEncryptionPassword">
+          <div v-show="!hasEncryptionPassword" class="text-xs mb-4">
             Since now you've logged in, you can sync your endpoints across devices. But first, you need to provide a
             password to encrypt and decrypt your data. Remember, this password will be stored locally and will not be
             sent to our
@@ -32,16 +32,18 @@
           <form action="javascript:" @submit="saveEncryptionPassword">
             <label for="en_password" class="text-sm">Encryption/Decryption Password</label>
             <div class="flex">
-              <input class="mb-0" type="password" id="en_password" min="16" required v-model="encryptionPassword"
-                     v-if="!showPassword"
+              <input
+v-if="!showPassword" id="en_password" v-model="encryptionPassword" class="mb-0" type="password" min="16"
+                     required
                      @focus="encryptionPasswordInputFocus = true" @blur="encryptionPasswordInputFocus = false">
-              <input class="mb-0" type="text" id="en_password" min="16" required v-model="encryptionPassword" v-else>
+              <input v-else id="en_password" v-model="encryptionPassword" class="mb-0" type="text" min="16" required>
               <button class="shrink-0 text-xs outline inline-block w-auto ml-2" type="submit">
                 {{ hasEncryptionPassword ? 'Update' : 'Save' }}
               </button>
             </div>
             <div>
-              <input type="checkbox" v-model="showPassword" id="show_password"> <label for="show_password"
+              <input id="show_password" v-model="showPassword" type="checkbox"> <label
+for="show_password"
                                                                                        class="text-xs">Show
               password</label>
             </div>
@@ -49,16 +51,19 @@
           </form>
         </div>
         <div class="text-xs">
-          <button class="inline-block w-auto text-xs mb-2" :disabled="!hasEncryptionPassword || syncingMyData"
-                  @click="syncMyData" :aria-busy="syncingMyData">🔼 Push
+          <button
+class="inline-block w-auto text-xs mb-2" :disabled="!hasEncryptionPassword || syncingMyData"
+                  :aria-busy="syncingMyData" @click="syncMyData">🔼 Push
           </button>
-          <button class="inline-block w-auto text-xs ml-2 mb-2" :disabled="!hasEncryptionPassword || pullingMyData"
-                  @click="pullMyData" :aria-busy="pullingMyData">🔽 Pull
+          <button
+class="inline-block w-auto text-xs ml-2 mb-2" :disabled="!hasEncryptionPassword || pullingMyData"
+                  :aria-busy="pullingMyData" @click="pullMyData">🔽 Pull
           </button>
           <br>
           <button class="inline-block w-auto text-xs outline" @click="logout">Log Out</button>
-          <button class="ml-2 inline-block w-auto text-xs outline border-red-500 text-red-500" @click="deleteMyData"
-                  :disabled="deletingMyData" :aria-busy="deletingMyData">Delete all synced endpoints
+          <button
+class="ml-2 inline-block w-auto text-xs outline border-red-500 text-red-500" :disabled="deletingMyData"
+                  :aria-busy="deletingMyData" @click="deleteMyData">Delete all synced endpoints
           </button>
         </div>
         <div class="text-xs opacity-50 mt-2">
