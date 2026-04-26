@@ -25,7 +25,7 @@ id="fileInput" type="file" multiple class="absolute left-[-9999rem]" :disabled="
   </div>
   <div v-show="fileList.length" class="mt-2">
     <button
-class="inline-block w-auto shadow transition-all hover:shadow-xl hover:rounded-3xl" type="button"
+class="w-full shadow transition-all hover:shadow-xl hover:rounded-3xl" type="button"
       :disabled="uploading" @click="upload">🔥 Upload
     </button>
   </div>
@@ -480,8 +480,7 @@ let reUploadThisFile = function (file) {
 
 let renameThisFile = function (file) {
   const isUploaded = uploadedList.value.some((el) => el.id_key === file.id_key)
-  let newName = document.getElementById('input_' + file.id_key).value
-              .trim().replace(/[\\/:"*?<>|]/g, ''); // Remove illegal characters
+  let newName = document.getElementById('input_' + file.id_key).value.trim()
   if (!newName) return false;
   if (renameFileWithRandomId.value) {
     if (newName === file.id_key) {
@@ -615,7 +614,7 @@ let handleFolderNameBlur = function () {
   })
 
   // Update skip properties if needed
-  if (skipFilesWithTheSameName.value) {
+  if (!urlSuffix.value) {
     updateFileSkipProperty()
   }
 }
@@ -741,7 +740,7 @@ function uploadFile(file) {
 
   axios({
     method: 'put',
-    url: url + urlSuffix.value,
+    url: url + (urlSuffix.value ? `?${urlSuffix.value}` : ''),
     headers: {
       'Authorization': apiKey,
       'Content-Type': file.type
@@ -1075,11 +1074,6 @@ watch(uploadToFolder, (newVal) => {
 
       return file
     })
-  }
-
-  // Update skip properties if needed
-  if (skipFilesWithTheSameName.value) {
-    updateFileSkipProperty()
   }
 })
 
