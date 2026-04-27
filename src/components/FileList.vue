@@ -235,19 +235,13 @@ function getSortVariables(val) {
 }
 
 let sortFileList = function (sortKey, sortType) {
-  let temp = JSON.parse(JSON.stringify(fileList.value))
-  temp.map((el) => {
-    return (el.uploaded_timestamp = new Date(el.uploaded).getTime())
-  })
-
-  temp = temp.sort((a, b) => {
-    if (sortType === 'desc') {
-      return b[sortKey] - a[sortKey]
-    } else {
-      return a[sortKey] - b[sortKey]
-    }
-  })
-
+  // Shallow copy is enough — downstream (mapFilesToDir / parseDirs / template)
+  // only reads primitives off each item; nothing mutates them back.
+  const temp = fileList.value.map(el => ({
+    ...el,
+    uploaded_timestamp: new Date(el.uploaded).getTime()
+  }))
+  temp.sort((a, b) => sortType === 'desc' ? b[sortKey] - a[sortKey] : a[sortKey] - b[sortKey])
   return temp
 }
 
@@ -256,9 +250,9 @@ let { uploading, endPointUpdated } = storeToRefs(statusStore)
 
 let selectMode = ref(false)
 
-let endPoint = localStorage.getItem('endPoint')
-let apiKey = localStorage.getItem('apiKey')
-let customDomain = localStorage.getItem('customDomain')
+let endPoint = ref(localStorage.getItem('endPoint'))
+let apiKey = ref(localStorage.getItem('apiKey'))
+let customDomain = ref(localStorage.getItem('customDomain'))
 
 // watch(uploading, (newVal) => {
 //   if (!newVal) {
@@ -269,13 +263,13 @@ let customDomain = localStorage.getItem('customDomain')
 //   }
 // })
 
-watch(endPointUpdated, (newVal) => {
-  endPoint = localStorage.getItem('endPoint')
-  apiKey = localStorage.getItem('apiKey')
-  customDomain = localStorage.getItem('customDomain')
+watch(endPointUpdated, () => {
+  endPoint.value = localStorage.getItem('endPoint')
+  apiKey.value = localStorage.getItem('apiKey')
+  customDomain.value = localStorage.getItem('customDomain')
   fileList.value = []
   dirMap.value = {}
-  // loadData()
+  if (endPoint.value && apiKey.value) loadData()
 })
 
 let allFileSize = ref(0)
@@ -374,7 +368,7 @@ const copyButtonDisabled = ref(false)
 function copySelectedFileUrls() {
   // Access selected files using .value
   const fileUrls = selectedFiles.value.map((file) => {
-    const baseUrl = customDomain ? customDomain : endPoint
+    const baseUrl = customDomain.value || endPoint.value
     return baseUrl + file.key
   })
 
@@ -502,17 +496,12 @@ let deleteThisFile = function (key, isBatchDelete = false, options = {}) {
 
   deletingKey.value = key
 
-  let fileName = '/' + key
-  if (endPoint[endPoint.length - 1] === '/') {
-    fileName = key
-  }
-
   axios({
     method: 'delete',
     headers: {
-      'Authorization': localStorage.getItem('apiKey')
+      'Authorization': apiKey.value
     },
-    url: endPoint + fileName
+    url: endPoint.value + key
   })
     .then(async () => {
       deletingKey.value = ''
@@ -549,7 +538,7 @@ async function loadData(action) {
     loadDataErrorText.value = ''
     loadDataErrorStack.value = ''
 
-    if (!endPoint || !apiKey) {
+    if (!endPoint.value || !apiKey.value) {
       loading.value = false
       return false
     }
@@ -557,9 +546,9 @@ async function loadData(action) {
     const res = await axios({
       method: 'patch',
       headers: {
-        'Authorization': apiKey
+        'Authorization': apiKey.value
       },
-      url: endPoint + (action === 'more' && globalCursor.value ? '?cursor=' + globalCursor.value : '')
+      url: endPoint.value + (action === 'more' && globalCursor.value ? '?cursor=' + globalCursor.value : '')
     })
 
     if (globalCursor.value && action === 'more') {
@@ -590,5 +579,4 @@ async function loadData(action) {
   }
 }
 
-// loadData()
 </script>

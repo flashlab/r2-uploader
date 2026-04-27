@@ -18,9 +18,9 @@ const html_template = `
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>R2 Uploader</title>
   <link rel="shortcut icon" href="https://emojicdn.elk.sh/🗄️" type="image/x-icon">
-  <link rel="stylesheet" href="https://worker-shrill-water-2ae4.jw1dev.workers.dev/main.css">
-  <link rel="stylesheet" href="https://worker-shrill-water-2ae4.jw1dev.workers.dev/pico.min.css">
-  <link rel="stylesheet" href="https://worker-shrill-water-2ae4.jw1dev.workers.dev/custom.css">
+  <link rel="stylesheet" href="./css/main.css">
+  <link rel="stylesheet" href="./css/pico.min.css">
+  <link rel="stylesheet" href="./css/custom.css">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,7 +58,7 @@ const html_template = `
 ###HTML###
 
 <footer style="text-align: center; font-size: .6rem; padding: 2rem 0">
-  Made by <a href="https://github.com/jw-12138">jw-12138</a> with ❤️
+  Made by <a href="https://github.com/jw-12138">jw-12138</a>, fork by flashlab with ❤️
 </footer>
 </div>
 </body>

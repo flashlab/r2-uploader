@@ -70,9 +70,6 @@ class="inline-block w-auto text-sm mb-0" :disabled="btnDisabled" type="submit"
           </div>
         </form>
       </article>
-      <!-- <article>
-        <sync-endpoints></sync-endpoints>
-      </article> -->
     </details>
 
   </div>
@@ -81,12 +78,10 @@ class="inline-block w-auto text-sm mb-0" :disabled="btnDisabled" type="submit"
 <script setup>
 import {onMounted, ref, watch} from 'vue'
 import {useStatusStore} from '../store/status'
-import SyncEndpoints from './syncEndpoints.vue'
 import { storeToRefs } from 'pinia'
 import {animateText} from '../utils/animateText.js'
 
 let statusStore = useStatusStore()
-let { endPointPulled } = storeToRefs(statusStore)
 
 let endPoint = ref('')
 let apiKey = ref('')
@@ -199,15 +194,15 @@ const saveApiInfo = function () {
   }
 
   // check for duplicate
-  let duplicate = endPointList.value.find(item => item.endPoint === newEndpoint.value)
+  let dupIdx = endPointList.value.findIndex(item => item.endPoint === newEndpoint.value)
 
-  // if duplicated, update the apiKey and customDomain
-  if (duplicate) {
-    duplicate.apiKey = newApiKey.value
-    duplicate.customDomain = newCustomDomain.value
-    endPointList.value = endPointList.value.filter(item => item.endPoint !== newEndpoint.value)
-    endPointList.value.push(duplicate)
-
+  if (dupIdx !== -1) {
+    // update in place to preserve list order
+    endPointList.value[dupIdx] = {
+      endPoint: newEndpoint.value,
+      apiKey: newApiKey.value,
+      customDomain: newCustomDomain.value
+    }
     if (endPoint.value === newEndpoint.value) {
       updateCurrentEndPoint(newEndpoint.value)
     }
@@ -217,6 +212,8 @@ const saveApiInfo = function () {
       apiKey: newApiKey.value,
       customDomain: newCustomDomain.value
     })
+    // a freshly added endpoint always becomes the active one
+    updateCurrentEndPoint(newEndpoint.value)
   }
 
   editingEndpoint.value = ''
@@ -229,10 +226,6 @@ const saveApiInfo = function () {
     skipText: 'S'
   })
   btnDisabled.value = true
-
-  if (endPointList.value.length === 1) {
-    updateCurrentEndPoint(newEndpoint.value)
-  }
 
   newEndpoint.value = ''
   newApiKey.value = ''
@@ -260,19 +253,6 @@ watch(endPointList, val => {
   localStorage.setItem('localEndpointListUpdateTime', Date.now() + '')
 }, {
   deep: true
-})
-
-watch(endPointPulled, val => {
-  restoreEndPointList()
-
-  if (endPointList.value.length >= 1) {
-    endPoint.value = endPointList.value[0].endPoint
-    apiKey.value = endPointList.value[0].apiKey
-    customDomain.value = endPointList.value[0].customDomain || ''
-    updateCurrentEndPoint(endPointList.value[0].endPoint)
-  }
-
-  restoreSavedApiInfo()
 })
 
 onMounted(() => {

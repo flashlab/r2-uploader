@@ -26,5 +26,6 @@ bunfig.toml
 .vercel
 setup-guide/*.html
 public/setup-guide/*.html
+public/setup-guide/css/main.css
 
 .env

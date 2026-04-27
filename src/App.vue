@@ -17,10 +17,10 @@
   </div>
 
   <footer class="text-center text-xs py-[2rem] opacity-80">
-    <span>Made by <a href="https://github.com/jw-12138">jw-12138</a> with ❤️
+    <span>Made by <a href="https://github.com/jw-12138">jw-12138</a>, fork by flashlab with ❤️
       <br>
       <a href="/setup-guide/">Setup Guide</a> | 
-      <a href="https://github.com/jw-12138/r2-uploader">Open Source</a></span>
+      <a href="https://github.com/flashlab/r2-uploader">Open Source</a></span>
   </footer>
 </template>
 

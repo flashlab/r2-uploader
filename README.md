@@ -1,225 +1,144 @@
-<span style="font-size: .8rem">Last updated: 2024-07-01</span>
+<span style="font-size: .8rem">Last updated: 2026-04-27</span>
 
-### Why this tool? 🤔
+# R2 Uploader
 
-In May 2022, Cloudflare launched R2 into open beta, a new S3-like object storing platform with generous free tier. It is a great alternative to AWS S3, especially for small projects and personal use. However, Cloudflare dashboard could only upload files smaller than 300MB, which is not ideal for large files. This tool is a simple web interface for R2, which allows you to manage your files in R2 buckets.
+Cloudflare R2 的纯前端 Web 管理界面。所有凭证保存在浏览器 LocalStorage，所有流量直连用户自部署的 Cloudflare Worker，仓库本身不持有任何后端密钥或对象数据。
 
-### Requirements ☝️
+> 本仓库 fork 自 [`jw-12138/r2-uploader`](https://github.com/jw-12138/r2-uploader)，主要变更是引入分片上传（MPU）路径并把 Worker 拆出到独立仓库 [`flashlab/r2-uploader-worker`](https://github.com/flashlab/r2-uploader-worker)。
 
-- Cloudflare account
-- Cloudflare R2 Subscription (has a free quota)
-- Cloudflare Workers Subscription (free plan would be enough)
+## 项目摘要
 
-![](https://r2-cf-api.jw1.dev/dashboard.png)
+Cloudflare 控制台单文件上传上限 300 MB，对大文件场景不友好。本工具通过自部署的 Cloudflare Worker 代理 R2 读写，提供：
 
-### Set up the R2 bucket 📦
+- 浏览器内上传、列举、下载、删除 R2 对象
+- 大文件走 R2 Multipart Upload，断点续传跨刷新可恢复
+- 多 Endpoint 切换、Bucket 私有 / 公开均支持
 
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/).
-2. On the left panel, there is a section called "R2". Click on it.
-3. Create a new bucket by clicking on the "Create Bucket" button. (You will need to input the bucket name)
+## 架构
 
-And that's it, now we set up the workers.
+```
+┌────────────────────────┐    HTTPS    ┌──────────────────────┐    Bindings    ┌────────────┐
+│ R2 Uploader (Vue 3)    │ ─────────▶  │ User-deployed Worker │ ─────────────▶ │ R2 Bucket  │
+│   - 本仓库构建产物      │             │ - flashlab/r2-uploader-worker        │            │
+│   - 部署在 CF Pages     │             │   或 README 内嵌 worker             │            │
+└────────────────────────┘             └──────────────────────┘                └────────────┘
+```
 
-### Set up the Worker 👷‍♂️
+- **前端（本仓库）**：Vue 3 + Vite + Pinia + Tailwind，无路由，单页面挂载 `EndPointManage` / `CustomUploader` / `FileList` 三个组件。无服务端代码。
+- **后端（独立仓库）**：用户自部署的 Cloudflare Worker，承载鉴权与 R2 SDK 调用。两种实现兼容同一前端：
+  - **简易版**：[setup guide](https://r2.313159.xyz/setup-guide/) 中的内嵌 Worker，仅支持单次 PUT，单文件 ≤ 95 MB。
+  - **完整版**：[`flashlab/r2-uploader-worker`](https://github.com/flashlab/r2-uploader-worker)（Hono + TypeScript），额外暴露 `support_mpu` / `mpu/*` 端点，支持分片上传与断点续传。
 
-A Worker is like the backend of a website, it allows the R2 Uploader to communicate with the R2 bucket. **This is the most important part of the setup, so please follow the steps carefully.**
+### 前端状态约定
 
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/).
-2. On the left panel, there is a section called "Workers & Pages". Click on it.
-3. Click on the "Create Application" button and the click on the "Create Worker" button.
-4. So now Cloudflare will automatically generate a name for your Worker, you can either enter a name you like or leave it as it is. Ignore that code preview section, and now click the "Deploy" button.
-5. Click on the button "Edit code", now you will see a code editor, delete all the code in it and paste the code  below:
+LocalStorage 是**唯一事实来源**，不是 Pinia。组件直接读写 `endPoint`、`apiKey`、`customDomain`、`endPointList`、`mpuPending` 等键。`src/store/status.js` 仅作为信号总线（`endPointUpdated` 计数器），用于通知兄弟组件重新读取 LocalStorage。修改 endpoint 相关逻辑时必须保留该计数器递增，否则 `CustomUploader` 与 `FileList` 会静默失同步。详见 [CLAUDE.md](CLAUDE.md)。
 
-   <details><summary>Expand the code</summary>
+### Worker 协议契约
 
-   ```js
-   var hasValidHeader = (request, env) => {
-      return request.headers.get('Authorization') === env.AUTH_KEY_SECRET
-   }
-   function authorizeRequest(request, env, key) {
-      switch (request.method) {
-      case 'PUT':
-         if (key.length < 1) return false
-         return hasValidHeader(request, env)
-      case 'DELETE':
-         if (key.length < 1) return false
-         return hasValidHeader(request, env)
-      case 'PATCH':
-         return hasValidHeader(request, env)
-      case 'GET':
-         if (key.length < 1) return false
-         return !env.PRIVATE_BUCKET || hasValidHeader(request, env)
-      case 'OPTIONS':
-         return true
-      default:
-         return false
-      }
-   }
-   var worker_default = {
-      async fetch(request, env) {
-      const url = new URL(request.url)
-      let key = decodeURIComponent(url.pathname.slice(5))
-      let respBody = null
-      let respStatus = 200
-      if (!authorizeRequest(request, env, key)) {
-         return new Response('Forbidden', { status: 403 })
-      }
-      const headers = new Headers()
-      // CORS setup
-      headers.set('Access-Control-Allow-Origin', '*')
-      headers.set('Access-Control-Allow-Methods', 'PUT, PATCH, GET, DELETE, OPTIONS')
-      headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-      headers.set('Access-Control-Expose-Headers', 'Content-Location')
-      try {
-         switch (request.method) {
-            case 'PUT':
-            let file = await env.R2_BUCKET.head(key);
-            if (file && url.searchParams.get('force') == null) {
-               if (url.searchParams.get('rename') != null) {
-                  const dot = key.lastIndexOf('.')
-                  if (dot == -1) key += '_'
-                  else key = key.substring(0, dot) + '_' + key.substring(dot)
-                  file = await env.R2_BUCKET.head(key)
-               }
-               if (file) {
-                  respBody = 'File already exists!'
-                  respStatus = 409
-                  break
-               }
-            }
-            const saved = await env.R2_BUCKET.put(key, request.body, {
-               httpMetadata: {
-                  contentType: request.headers.get('Content-Type') || '',
-                  cacheControl: 'public, max-age=604800'
-               }
-            })
-            if (saved) {
-               headers.set('Content-Location', encodeURIComponent(key))
-               respStatus = 201
-            }
-            break
-            case 'PATCH':
-            headers.set('Content-Type', 'application/json')
-            respBody = JSON.stringify(await env.R2_BUCKET.list())
-            break
-            case 'GET':
-            const object = await env.R2_BUCKET.get(key)
-            if (object === null) {
-               respBody = 'Object Not Found!'
-               respStatus = 404
-               break
-            }
-            object.writeHttpMetadata(headers)
-            headers.set('etag', object.httpEtag)
-            respBody = object.body
-            break
-            case 'DELETE':
-            await env.R2_BUCKET.delete(key)
-            respBody = 'Deleted!'
-            break
-            case 'OPTIONS':
-            break
-            default:
-            respBody = 'Method Not Allowed!'
-            respStatus = 405
-         }
-      } catch (error) {
-         return new Response("Internal Server Error", { status: 500 })
-      }
-      return new Response(respBody, {
-         headers: headers,
-         status: respStatus
-      })
-      }
-   }
-   export { worker_default as default }
-   ```
+| 方法 | 路径 | 鉴权头 | 说明 |
+|---|---|---|---|
+| `PUT` | `{endPoint}{key}?[force\|rename]` | `Authorization: <apiKey>` | 单次上传；`201` + `Content-Location` 表示成功，`409` 表示重名冲突 |
+| `GET` | `{endPoint}{key}` | 公开桶免鉴权；私有桶要求 `Authorization` | 取对象 |
+| `DELETE` | `{endPoint}{key}` | `Authorization` | 删除对象 |
+| `PATCH` | `{endPoint}?cursor=...` | `Authorization` | 列举，返回 `{objects, truncated, cursor}` |
+| `GET` | `{endPoint}support_mpu` | — | MPU 能力探测，任何 200 视为支持 |
+| `POST` | `{endPoint}mpu/create/{key}` | `x-api-key` | 创建 MPU，返回 `{uploadId}` |
+| `PUT` | `{endPoint}mpu/{key}?uploadId=&partNumber=` | `x-api-key` | 上传分片，返回包含 `etag` 的 `R2UploadedPart` |
+| `POST` | `{endPoint}mpu/complete/{key}?uploadId=` | `x-api-key` | 完成 MPU，body 中 `parts` 必须按 `partNumber` 升序 |
+| `DELETE` | `{endPoint}mpu/{key}?uploadId=` | `x-api-key` | 中止 MPU |
 
-   </details>
-6. Now click on the "Save and Deploy" button, you will see a URL on top of the page, copy it to somewhere like a notepad, **we will need it later**.
-7. Go to the worker page, go to the "Settings" and then click the "Variable" on the left side.
+修改任一请求形态时，**两种 Worker 实现都必须同步更新**，否则使用旧版内嵌 Worker 的用户会静默失败。
 
-   ![](https://r2-cf-api.jw1.dev/r2_page.png)
+## 特性
 
-8. First we focus on the "Environment Variables" section, we need to add a key value pair for the Worker to read as a configuration. Click on the "Add variable" button, and then enter the variable name as "AUTH_KEY_SECRET" and the value is a random string, you can generate one [here](https://www.avast.com/random-password-generator), click "Save and deploy". Remember to save the value somewhere, **we will need it later**.
+- **大文件分片上传**：> 95 MB 自动走 MPU，分片 10 MB，5 路并发，每片最多重试 5 次。
+- **断点续传**：每片成功后写入 `localStorage.mpuPending`，刷新或关闭页面后**重新选中同一文件**（依据 `name|size|lastModified` 匹配）即可继续。条目保留 7 天，过期自动清理。
+- **多 Endpoint 管理**：可保存多组 Worker URL + API Key + 自定义域名，运行时切换。
+- **私有桶**：Worker 端设置 `PRIVATE_BUCKET=true` 后，所有 GET 请求强制鉴权。
+- **图片预压缩**：基于 [compressorjs](https://github.com/fengyuanchen/compressorjs) 的客户端压缩，可选去 EXIF、转 webp/jpg/png、限制最大宽高与质量。
+- **目录上传**：使用浏览器 [`showDirectoryPicker`](https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker)（不支持的浏览器会隐藏入口）。
+- **拖拽与粘贴**：可拖入文件或从系统剪贴板粘贴。
+- **重命名以入子目录**：把 key 改成 `folder/file.txt` 即可在桶内形成目录结构。
+- **自定义资源域名**：列表中的预览链接会走 `customDomain`，便于绑定 R2 自定义域名加速。
 
-   ![](https://r2-cf-api.jw1.dev/workers_api_key_setup.png)
+## 部署
 
-9. Now we scroll down to the "R2 Bucket Bindings" section, click on the "Add binding" button, and then enter the variable name as "R2_BUCKET" and the value is the name of the bucket you created earlier, click "Save and deploy".
+### 1. 部署 R2 Bucket
 
-   ![](https://r2-cf-api.jw1.dev/r2_bindings_to_worker.png)
+1. 进入 [Cloudflare Dashboard](https://dash.cloudflare.com/) → R2 → Create Bucket，设置 bucket 名称。
 
-If you go to the Worker URL now, you will see a "Object Not Found" message, that means the worker is working as expected.
+### 2. 部署 Worker（后端）
 
-Now we have set up the worker, we can now set up the uploader.
+参见 [`flashlab/r2-uploader-worker`](https://github.com/flashlab/r2-uploader-worker) 仓库 README。基本步骤：
 
-### Set up the Uploader 🗄️
+1. `git clone` 该仓库后用 `wrangler deploy`，或在 Cloudflare Workers 控制台粘贴源码部署。
+2. 在 Worker 设置中绑定：
+   - **环境变量** `AUTH_KEY_SECRET`：随机字符串，作为前端 API Key。
+   - **环境变量** `PRIVATE_BUCKET`（可选）：设为 `true` 后桶变为私有，GET 也需鉴权。
+   - **R2 Bucket 绑定** `R2_BUCKET`：指向上一步创建的桶。
+3. 部署后保存 Worker URL 与 `AUTH_KEY_SECRET`。
 
-Phew, we've come a long way, now we are going to set up the uploader, which is the web interface for the R2 bucket.
+如果只需要小文件（≤ 95 MB）单次上传，可使用 setup-guide 中给出的内嵌单文件 Worker，无需克隆仓库。
 
-![](https://r2-cf-api.jw1.dev/eFeFgOgn_bXLbpYs.png)
+### 3. 部署前端（本仓库）
 
-Remember the Worker URL and the random string we saved earlier? We will need them now.
+#### 3.1 使用现有 Cloudflare Pages 流水线
 
-In R2 Uploader, we call the Worker URL as the "Endpoint" and the random string as the "API Key". Enter the Endpoint and the API key, ignore the custom domain for now and click "Save to LocalStorage".
+仓库已包含 [.github/workflows/deploy.yml](.github/workflows/deploy.yml)：推送到 `main` 时自动 `bun run build` 并发布 `./dist` 到 Cloudflare Pages 项目 `r2-zzbd`。fork 后需要在 GitHub Actions Secrets 中配置：
 
-Now you can upload and manage your files in the R2 bucket!
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
 
-![upload files with the uploader](https://r2-cf-api.jw1.dev/p3eqM3JOpcDfzXdi.png)
+并把 workflow 中的 `projectName: r2-zzbd` 改成自己的 Pages 项目名。
 
-<span style="font-size: 2rem">🎉</span>
+#### 3.2 本地构建与部署
 
-R2 Uploader **does not** store your Endpoints or API keys in the cloud, it is stored in your browser's LocalStorage, which means it is only accessible by you. All the traffic goes through the Worker and the R2 bucket you just created.
+包管理器使用 **bun**（`bun.lockb`）。
 
-**Note:** We use `showDirectoryPicker` API to make the folder upload possible, if the `Choose Folder` button doesn't show up, it simply means that your browser does not support this API. ([showDirectoryPicker on MDN](https://developer.mozilla.org/en-US/docs/Web/API/Window/showDirectoryPicker))
+```bash
+bun install
+bun run dev          # Vite dev server, http://localhost:7896
+bun run build        # 先 build:setup（渲染 md + 编译 setup-guide CSS），再 vite build 到 dist/
+bun run preview      # 预览构建产物
+bun run clean        # rm -rf dist
+bun run deploy       # 构建后通过 wrangler 直接发布到 Cloudflare Pages
+```
 
-### For private use 🔒
+> `vite build` 单独执行**不会**生成 `/setup-guide/` 下的 HTML 与 `main.css`，必须经由 `bun run build`（即先跑 `build:setup`）才能产出可访问的设置指南页面。
 
-At default, the Worker will allow all the GET requests to go through, which means anyone can access your file if they know the URL.
+`bun run deploy` 等价于 GitHub Actions 流水线，但本地直推。**首次使用先一次性 OAuth 登录**，之后无需任何环境变量：
 
-If you want to make your bucket private, you can do so by adding a new variable in the Worker settings.
+```bash
+bunx wrangler login    # 浏览器 OAuth，凭证缓存在 ~/.wrangler/config/default.toml
+bun run deploy         # 之后每次部署直接执行
+```
 
-1. Go to the worker page, go to the "Settings" and then click the "Variable" on the left side.
-2. Click on the "Edit variable" and "Add variable" button, then enter the variable name as "PRIVATE_BUCKET" and the value is "true", click "Save and deploy".
-   
-This will make the Worker to check the `Authorization` header for every request, and only allow the request with the correct API key to go through.
+- 命令实质是 `bunx wrangler pages deploy ./dist --project-name=r2-zzbd`，wrangler 通过 `bunx` 临时拉取，无需作为依赖。
+- 不想用 OAuth 时也可改走环境变量：`CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... bun run deploy`，所需凭证与 [.github/workflows/deploy.yml](.github/workflows/deploy.yml) 中的 secrets 一致（`CLOUDFLARE_API_TOKEN` 需带 Pages: Edit 权限）。
+- 默认目标项目为 `r2-zzbd`，fork 后请把 `package.json` 中 `--project-name` 改为自己的 Pages 项目名，并同步修改 workflow 文件。
 
-If you want the bucket to be public again, just delete the variable.
+#### 3.3 Setup-guide 静态资源管线
 
-### Set up a custom domain 🌐
+[public/setup-guide/](public/setup-guide/) 下的 HTML 由 [gen_markdown.js](public/setup-guide/gen_markdown.js) 把同目录的 `.md` 文件用固定模板渲染而成；样式来自三份本地 CSS：
 
-By default, the Worker URL should be working right away, unless you want the url to be a little bit clean or, you live in China (or maybe some other country). Unfortunately, the domain name `workers.dev` is blocked in China, so we need to set up a custom domain.
+- [public/setup-guide/css/pico.min.css](public/setup-guide/css/pico.min.css) — 直接 commit 的第三方静态文件。
+- [public/setup-guide/css/custom.css](public/setup-guide/css/custom.css) — 直接 commit 的项目级覆盖样式。
+- `public/setup-guide/css/main.css` — **构建产物**（已 gitignore），由 [setup-guide-src/main.css](setup-guide-src/main.css) 经 Tailwind 编译而来，配置在 [tailwind.setup-guide.config.cjs](tailwind.setup-guide.config.cjs)。
 
-Workers and R2 both supports custom domain, and we just need one of them to make the R2 work in China.
+修改 setup-guide 的 Tailwind 样式请编辑 `setup-guide-src/main.css`，运行 `bun run build:setup` 重新编译。
 
-**For Workers:**
+ESLint 已配置（`eslint.config.js`，flat config，vue/recommended + prettier），但 `package.json` 未挂 `lint` script，需要时执行 `bunx eslint .`。仓库无测试套件。
 
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/).
-2. On the left panel, there is a section called "Workers & Pages". Click on it.
-3. Go to your Worker, click on the "Triggers", you'll see a custom domain section, click on the "Add Custom Domain" button. Input the domain name and you're done!
-4. Remember to replace the Endpoint in the R2 Uploader with the custom domain.
+### 4. 配置前端
 
-**For R2:**
+部署完成后访问站点，在「Endpoints」面板中：
 
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/).
-2. On the left panel, there is a section called "R2". Click on it.
-3. Go to your bucket, click on the "Settings", find "Custom Domains" section, and then click on the "Connect Domain" button. Input the domain name just like you did in the Workers, and you're done!
-4. Remember to update the **Custom Domain** in the R2 Uploader with **the R2 custom domain**.
+- **Workers Endpoint**：步骤 2 拿到的 Worker URL（结尾若无 `/` 会自动补全）。
+- **Workers Endpoint API Key**：`AUTH_KEY_SECRET` 的值。
+- **Custom Domain**（可选）：R2 桶自定义域名，仅影响列表页中文件预览链接。
 
-   Attention! This time, instead of changing the Endpoint field in the R2 Uploader, we change the Custom Domain field with the R2 custom domain.
+凭证保存在浏览器 LocalStorage，仓库与 Pages 站点本身不接触这些值。
 
-   ![](https://r2-cf-api.jw1.dev/endpoint.png)
+## 反馈
 
-This sounds a little bit complicated, let me break it down for you:
-
-- Setting up a custom domain for Workers is the simplest way to work with R2 Uploader
-
-### Hidden features 😜
-
-1. You can copy a file from your system and then paste it into the uploader, it will automatically queue the file and ready to be uploaded.
-2. To edit the name of queued files, just click on the file name.
-3. Rename the file like `folder/file.txt` will upload the `file.txt` to the folder, you'll get a folder structure in your bucket.
-
----
-
-Ok now, I think we've covered everything, if you have any questions, feel free to create a new issue under [this repo](https://github.com/jw-12138/r2-uploader/issues).
+问题与建议请提到 [flashlab/r2-uploader/issues](https://github.com/flashlab/r2-uploader/issues)。Worker 相关问题请提到 [flashlab/r2-uploader-worker/issues](https://github.com/flashlab/r2-uploader-worker/issues)。

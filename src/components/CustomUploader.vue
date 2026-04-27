@@ -1,5 +1,24 @@
 <template>
   <div class="font-bold italic">Upload Files</div>
+  <div v-if="pendingUploads.length" class="text-xs mb-2 mt-1 rounded bg-amber-50 dark:bg-amber-950 px-3 py-2 shadow">
+    <details>
+      <summary class="cursor-pointer">
+        ↻ {{ pendingUploads.length }} unfinished upload{{ pendingUploads.length === 1 ? '' : 's' }} —
+        re-pick the same file{{ pendingUploads.length === 1 ? '' : 's' }} to resume
+      </summary>
+      <ul class="my-2 pl-4 list-disc space-y-0.5">
+        <li v-for="p in pendingUploads" :key="p.uploadId" class="break-all">
+          {{ p.fileName }} <span class="opacity-60">({{ parseByteSize(p.fileSize) }}, {{ p.completedParts.length }}/{{ Math.ceil(p.fileSize / p.partSize) }} parts)</span>
+        </li>
+      </ul>
+      <button
+        type="button"
+        class="inline-block w-auto outline mb-0 border-red-500 text-red-500"
+        style="padding: .15rem .5rem"
+        @click="discardAllPending"
+      >Discard all</button>
+    </details>
+  </div>
   <div class="drop-zone" @dragover.prevent="handleDragOver" @drop="handleDrop" @paste="handlePaste">
     <span class="text-xs opacity-50">Drag and drop files here or paste files.</span>
     <div>
@@ -209,6 +228,7 @@ v-show="editKey !== item.id_key"
         <span v-show="uploading && statusMap[item.id_key] !== 'compressing'"> / {{ progressMap[item.id_key] }}%</span>
         <span v-show="statusMap[item.id_key] === 'compressing'">Compressing...</span>
         <span v-show="statusMap[item.id_key] === 'splitting' && item.isMpu">Splitting Chunks...</span>
+        <span v-show="item.resumeFrom" class="ml-2 text-blue-500 dark:text-blue-300">↻ Resuming</span>
       </span>
     </div>
     <div
@@ -289,12 +309,21 @@ v-show="statusMap[item.id_key] !== 'uploading'" title="Re-Upload this file"
 </template>
 
 <script setup>
-import { reactive, ref, watch, onMounted } from 'vue'
+import { reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { useStatusStore } from '../store/status'
 import { nanoid } from 'nanoid'
 import Compressor from 'compressorjs'
 import { storeToRefs } from 'pinia'
+import {
+  recordCreate,
+  recordPart,
+  recordRemove,
+  findResumable,
+  listForEndpoint,
+  fileSig,
+  pruneStale
+} from '../utils/mpuStore'
 
 let statusStore = useStatusStore()
 
@@ -318,8 +347,29 @@ let compressImagesBeforeUploading = ref(false)
 let uploadToFolder = ref(false)
 let customFolderName = ref('')
 let endPoint = ref(localStorage.getItem('endPoint'))
-let customDomain = ref(localStorage.getItem('customDomain') || endPoint)
+let customDomain = ref(localStorage.getItem('customDomain') || endPoint.value)
 let { endPointUpdated } = storeToRefs(statusStore)
+
+const pendingUploads = ref([])
+function refreshPending() {
+  pendingUploads.value = endPoint.value ? listForEndpoint(endPoint.value) : []
+}
+
+async function discardAllPending() {
+  if (!confirm('Discard all pending uploads? Their multipart sessions will be aborted on R2.')) return
+  const apiKey = localStorage.getItem('apiKey')
+  for (const e of [...pendingUploads.value]) {
+    try {
+      await axios({
+        method: 'delete',
+        url: e.endPoint + 'mpu/' + (renameFileWithRandomId.value ? e.id_key : e.key) + '?uploadId=' + e.uploadId,
+        headers: { 'x-api-key': apiKey }
+      })
+    } catch (_) { /* ignore — clear local entry regardless */ }
+    recordRemove(e.uploadId)
+  }
+  refreshPending()
+}
 
 let clearUploadedFiles = function () {
   uploadedList.value = []
@@ -342,7 +392,8 @@ let defaultCompressOptions = reactive({
 
 watch(endPointUpdated, () => {
   endPoint.value = localStorage.getItem('endPoint')
-  customDomain.value = localStorage.getItem('customDomain') || endPoint
+  customDomain.value = localStorage.getItem('customDomain') || endPoint.value
+  refreshPending()
 })
 
 watch(defaultCompressOptions, function (val) {
@@ -350,6 +401,9 @@ watch(defaultCompressOptions, function (val) {
 })
 
 onMounted(() => {
+  pruneStale()
+  refreshPending()
+
   let defaultCompressOptionsStr = localStorage.getItem('defaultCompressOptions')
   if (defaultCompressOptionsStr) {
     try {
@@ -365,6 +419,8 @@ onMounted(() => {
       console.log(e)
     }
   }
+
+  window.addEventListener('beforeunload', beforeUnloadHandler)
 })
 
 let compressImage = async function (file) {
@@ -445,7 +501,26 @@ let removeThisFile = function (file) {
   const filename = renameFileWithRandomId.value ? file.id_key : file.key
   const isUploaded = uploadedList.value.some((el) => el.id_key === file.id_key)
   if (!isUploaded) {
-    abortControllerMap.value[file.id_key]?.abort()
+    const ctrl = abortControllerMap.value[file.id_key]
+    if (Array.isArray(ctrl)) {
+      // MPU in flight: signal the outer loop, abort all in-flight part PUTs, and tell R2 to drop the multipart session
+      file.aborted = true
+      ctrl.forEach((c) => { try { c?.abort() } catch (_) {} })
+      if (file.uploadId) {
+        const apiKey = localStorage.getItem('apiKey')
+        const uploadKey = renameFileWithRandomId.value ? file.id_key : file.key
+        axios({
+          method: 'delete',
+          url: endPoint.value + 'mpu/' + uploadKey + '?uploadId=' + file.uploadId,
+          headers: { 'x-api-key': apiKey }
+        }).catch(() => {}).finally(() => {
+          recordRemove(file.uploadId)
+          refreshPending()
+        })
+      }
+    } else {
+      ctrl?.abort()
+    }
     fileList.value = fileList.value.filter((item) => item.id_key !== file.id_key)
     doneUploadingCleanUp()
   } else {
@@ -669,7 +744,14 @@ let handleFiles = function (files) {
     } else {
       file.id_key = nanoid(16) + '.' + extension
     }
-    statusMap[file.id_key] = 'readytouupload'
+    if (endPoint.value) {
+      const resumable = findResumable(file, endPoint.value)
+      if (resumable) {
+        file.key = resumable.key
+        file.id_key = resumable.id_key
+        file.resumeFrom = resumable
+      }
+    }
     genImagePreview(extension, file)
   })
   fileList.value = [...fileList.value, ...Array.from(files)]
@@ -704,9 +786,8 @@ const upload = function () {
     if (file.shouldBeSkipped) return false
 
     if (compressImagesBeforeUploading.value) {
-      statusMap[file.id_key] = 'compressing'
+      statusMap.value[file.id_key] = 'compressing'
       fileList.value[index] = await compressImage(file)
-      statusMap[file.id_key] = 'readytouupload'
       uploadFile(fileList.value[index])
       return false
     }
@@ -727,10 +808,7 @@ function uploadFile(file) {
   file.startUploadingTime = new Date().getTime()
 
   realTimeSpeedRecords.value[file.id_key] = [
-    {
-      time: new Date().getTime(),
-      loaded: 0
-    }
+    { time: new Date().getTime(), loaded: 0 }
   ]
 
   if (file.size > 1024 * 1024 * 95) {
@@ -738,18 +816,21 @@ function uploadFile(file) {
     return false
   }
 
+  attemptSinglePut(file, url, apiKey, 5)
+}
+
+function attemptSinglePut(file, url, apiKey, retryLeft) {
   axios({
     method: 'put',
     url: url + (urlSuffix.value ? `?${urlSuffix.value}` : ''),
     headers: {
       'Authorization': apiKey,
-      'Content-Type': file.type
+      'Content-Type': file.type || 'application/octet-stream'
     },
     signal: abortControllerMap.value[file.id_key].signal,
     data: file,
     onUploadProgress(event) {
       progressMap.value[file.id_key] = ((100 * event.loaded) / event.total).toFixed(1)
-
       realTimeSpeedRecords.value[file.id_key].push({
         time: new Date().getTime(),
         loaded: event.loaded
@@ -758,19 +839,32 @@ function uploadFile(file) {
   })
     .then((res) => {
       statusMap.value[file.id_key] = 'done'
-      const key = decodeURIComponent(res.headers['content-location'])
+      const key = decodeURIComponent(res.headers['content-location'] || '')
       if (key && key != file.key) file.key = key
       file.endUploadingTime = new Date().getTime()
       file.uploadUsedTime = file.endUploadingTime - file.startUploadingTime
       file.uploadSpeed = calcUploadSpeed(file.size, file.uploadUsedTime)
     })
     .catch((e) => {
-      if (e.response && e.response.status == 409) {
-        statusMap.value[file.id_key] = 'dup'
-        uploadedList.value.push(file)
-      } else statusMap.value[file.id_key] = 'error'
+      const status = e.response?.status
+      const aborted = abortControllerMap.value[file.id_key]?.signal.aborted
+      const transient = !status || status >= 500
+      if (!aborted && transient && retryLeft > 0) {
+        // exponential-ish backoff: 500ms, 1s, 1.5s, 2s, 2.5s
+        file._retrying = true
+        abortControllerMap.value[file.id_key] = new AbortController()
+        progressMap.value[file.id_key] = 0
+        setTimeout(() => attemptSinglePut(file, url, apiKey, retryLeft - 1), 500 * (6 - retryLeft))
+        return
+      }
+      if (status == 409) statusMap.value[file.id_key] = 'dup'
+      else statusMap.value[file.id_key] = 'error'
     })
     .finally(() => {
+      if (file._retrying) {
+        delete file._retrying
+        return
+      }
       if (statusMap.value[file.id_key] !== 'error') {
         if (uploadedList.value.findIndex((el) => el.id_key === file.id_key) === -1) uploadedList.value.push(file)
         fileList.value = fileList.value.filter((item) => item.id_key !== file.id_key)
@@ -799,28 +893,47 @@ async function mpuUploadFile(file, apiKey) {
 
   if (!remoteSupport) {
     alert(
-      `R2 workers has refactored its code to support big file uploading, please see the new setup guide at https://r2.jw1.dev/setup-guide`
+      `R2 workers has refactored its code to support big file uploading, please see the new setup guide at https://r2.313159.xyz/setup-guide`
     )
     return false
   }
 
-  let {data} = await axios({
-    method: 'post',
-    url: endPoint.value + 'mpu/create/' + fileName,
-    headers: {
-      'x-api-key': apiKey
-    }
-  })
-  let uploadId = data.uploadId
-
   const partSize = 1024 * 1024 * 10
   const predictedParts = Math.ceil(file.size / partSize)
+  let uploadId
+
+  if (file.resumeFrom) {
+    uploadId = file.resumeFrom.uploadId
+  } else {
+    let { data } = await axios({
+      method: 'post',
+      url: endPoint.value + 'mpu/create/' + fileName,
+      headers: { 'x-api-key': apiKey }
+    })
+    uploadId = data.uploadId
+    recordCreate({
+      uploadId,
+      key: file.key,
+      id_key: file.id_key,
+      fileName: file.name,
+      fileSize: file.size,
+      fileSig: fileSig(file),
+      partSize,
+      endPoint: endPoint.value
+    })
+    refreshPending()
+  }
+  file.uploadId = uploadId
+
   const parts = []
   const maxThreads = 5
-  const completedParts = []
+  // hydrate from resume; defensively drop any partNumber out of range
+  const completedParts = file.resumeFrom
+    ? file.resumeFrom.completedParts.filter(p => p.partNumber >= 1 && p.partNumber <= predictedParts)
+    : []
   const activePartsSpeed = {}
 
-  let totalLoaded = 0
+  let totalLoaded = Math.min(file.size, completedParts.length * partSize)
   let activeThreadCount = 0
 
   abortControllerMap.value[file.id_key] = []
@@ -859,19 +972,62 @@ async function mpuUploadFile(file, apiKey) {
     progressMap.value[file.id_key] = ((totalLoaded / file.size) * 100).toFixed(1)
   }, 100)
 
+  function finalizeComplete() {
+    completedParts.sort((a, b) => a.partNumber - b.partNumber)
+    axios({
+      method: 'post',
+      url: endPoint.value + 'mpu/complete/' + fileName + '?' + `uploadId=${uploadId}`,
+      headers: { 'x-api-key': apiKey },
+      data: { parts: completedParts }
+    }).then((res) => {
+      statusMap.value[file.id_key] = 'done'
+      const key = decodeURIComponent(res.headers['content-location'] || '')
+      if (key && key != file.key) file.key = key
+      file.endUploadingTime = new Date().getTime()
+      file.uploadUsedTime = file.endUploadingTime - file.startUploadingTime
+      file.uploadSpeed = calcUploadSpeed(file.size, file.uploadUsedTime)
+      recordRemove(uploadId)
+      refreshPending()
+    })
+    .catch((e) => {
+      if (e.response && e.response.status == 409) {
+        statusMap.value[file.id_key] = 'dup'
+      } else statusMap.value[file.id_key] = 'error'
+    })
+    .finally(() => {
+      clearInterval(_s)
+      if (statusMap.value[file.id_key] !== 'error') {
+        if (uploadedList.value.findIndex((el) => el.id_key === file.id_key) === -1) uploadedList.value.push(file)
+        fileList.value = fileList.value.filter((item) => item.id_key !== file.id_key)
+      }
+      progressMap.value[file.id_key] = 100
+      doneUploadingCleanUp()
+    })
+  }
+
+  // Resume edge case: every part is already on R2 — go straight to complete.
+  if (completedParts.length === parts.length) {
+    finalizeComplete()
+    return
+  }
+
   for (let i = 0; i < parts.length; i++) {
     let part = parts[i]
     let partNumber = i + 1
 
+    // resume: skip parts already uploaded in a previous session
+    if (completedParts.some(p => p.partNumber === partNumber)) continue
+
     if (file.aborted === true) {
+      clearInterval(_s)
       setTimeout(async function () {
         await axios({
           method: 'delete',
-          url: endPoint.value + 'mpu/' + filename + '?' + `uploadId=${uploadId}`,
-          headers: {
-            'x-api-key': apiKey
-          }
+          url: endPoint.value + 'mpu/' + fileName + '?' + `uploadId=${uploadId}`,
+          headers: { 'x-api-key': apiKey }
         })
+        recordRemove(uploadId)
+        refreshPending()
       }, 500)
       break
     }
@@ -884,10 +1040,7 @@ async function mpuUploadFile(file, apiKey) {
     }
 
     // do not use await here
-    uploadParts({
-      part,
-      partNumber
-    })
+    uploadParts({ part, partNumber })
 
     activeThreadCount++
   }
@@ -897,9 +1050,7 @@ async function mpuUploadFile(file, apiKey) {
       statusMap.value[file.id_key] = 'error'
 
       abortControllerMap.value[file.id_key].forEach((s) => {
-        try {
-          s.abort()
-        } catch (_) {}
+        try { s?.abort() } catch (_) {}
       })
 
       file.uploading = false
@@ -927,7 +1078,7 @@ async function mpuUploadFile(file, apiKey) {
         url: endPoint.value + 'mpu/' + fileName + '?' + `uploadId=${uploadId}&partNumber=${partNumber}`,
         headers: {
           'x-api-key': apiKey,
-          'content-type': file.type
+          'content-type': file.type || 'application/octet-stream'
         },
         signal: abortControllerMap.value[file.id_key][partNumber].signal,
         data: part,
@@ -936,6 +1087,7 @@ async function mpuUploadFile(file, apiKey) {
         }
       })
     } catch (e) {
+      if (file.aborted) return false
       setTimeout(async function () {
         await uploadParts(_p, retryLeft - 1)
       }, 500)
@@ -945,85 +1097,79 @@ async function mpuUploadFile(file, apiKey) {
     // release the thread
     activeThreadCount--
 
-    completedParts.push({
-      partNumber,
-      etag: res.data.etag
-    })
+    completedParts.push({ partNumber, etag: res.data.etag })
+    recordPart(uploadId, partNumber, res.data.etag)
 
     // remove abort signal
     abortControllerMap.value[file.id_key][partNumber] = null
 
     if (completedParts.length === parts.length) {
-      axios({
-        method: 'post',
-        url: endPoint.value + 'mpu/complete/' + fileName + '?' + `uploadId=${uploadId}`,
-        headers: {
-          'x-api-key': apiKey
-        },
-        data: {
-          parts
-        }
-      }).then((res) => {
-        statusMap.value[file.id_key] = 'done'
-        const key = decodeURIComponent(res.headers['content-location'])
-        if (key && key != file.key) file.key = key
-        file.endUploadingTime = new Date().getTime()
-        file.uploadUsedTime = file.endUploadingTime - file.startUploadingTime
-        file.uploadSpeed = calcUploadSpeed(file.size, file.uploadUsedTime)
-      })
-      .catch((e) => {
-        if (e.response && e.response.status == 409) {
-          statusMap.value[file.id_key] = 'dup'
-          uploadedList.value.push(file)
-        } else statusMap.value[file.id_key] = 'error'
-      })
-      .finally(() => {
-        if (statusMap.value[file.id_key] !== 'error') {
-          if (uploadedList.value.findIndex((el) => el.id_key === file.id_key) === -1) uploadedList.value.push(file)
-          fileList.value = fileList.value.filter((item) => item.id_key !== file.id_key)
-        }
-        progressMap.value[file.id_key] = 100
-        doneUploadingCleanUp()
-      })
+      finalizeComplete()
     }
   }
 }
 
 let globalSpeed = ref('0B /s')
-setInterval(function () {
-  let keys = Object.keys(realTimeSpeedRecords.value)
+let globalSpeedTimer = null
+function startGlobalSpeed() {
+  if (globalSpeedTimer) return
+  globalSpeedTimer = setInterval(function () {
+    let keys = Object.keys(realTimeSpeedRecords.value)
 
-  let speedMap = {}
+    let speedMap = {}
 
-  keys.forEach((key) => {
-    let records = realTimeSpeedRecords.value[key]
-    let last2Records = records.slice(-2)
-    let lastRecord = last2Records[last2Records.length - 1]
-    let firstRecord = last2Records[0]
+    keys.forEach((key) => {
+      let records = realTimeSpeedRecords.value[key]
+      let last2Records = records.slice(-2)
+      let lastRecord = last2Records[last2Records.length - 1]
+      let firstRecord = last2Records[0]
 
-    if (!lastRecord) {
-      return false
-    }
+      if (!lastRecord) {
+        return false
+      }
 
-    let timeDiff = lastRecord.time - firstRecord.time
-    let loadedDiff = lastRecord.loaded - firstRecord.loaded
+      let timeDiff = lastRecord.time - firstRecord.time
+      let loadedDiff = lastRecord.loaded - firstRecord.loaded
 
-    if (timeDiff === 0) {
-      return false
-    }
+      if (timeDiff === 0) {
+        return false
+      }
 
-    speedMap[key] = (loadedDiff / timeDiff) * 1000 // bytes / s
-  })
+      speedMap[key] = (loadedDiff / timeDiff) * 1000 // bytes / s
+    })
 
-  let totalSpeed = 0
-  let speedMapKeys = Object.keys(speedMap)
+    let totalSpeed = 0
+    let speedMapKeys = Object.keys(speedMap)
 
-  speedMapKeys.forEach((key) => {
-    totalSpeed += speedMap[key]
-  })
+    speedMapKeys.forEach((key) => {
+      totalSpeed += speedMap[key]
+    })
 
-  globalSpeed.value = parseByteSize(totalSpeed) + '/s'
-}, 500)
+    globalSpeed.value = parseByteSize(totalSpeed) + '/s'
+  }, 500)
+}
+function stopGlobalSpeed() {
+  if (globalSpeedTimer) {
+    clearInterval(globalSpeedTimer)
+    globalSpeedTimer = null
+  }
+}
+watch(uploading, (val) => {
+  if (val) startGlobalSpeed()
+  else { stopGlobalSpeed(); globalSpeed.value = '0B /s' }
+})
+
+function beforeUnloadHandler(e) {
+  if (uploading.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+
+onUnmounted(() => {
+  stopGlobalSpeed()
+  window.removeEventListener('beforeunload', beforeUnloadHandler)
+})
 
 watch(
   fileList,
